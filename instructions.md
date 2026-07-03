@@ -2,7 +2,7 @@
 
 ## Documentation
 
-- [Gitea Actions documentation](https://docs.gitea.com/usage/actions/overview) — upstream reference for workflow syntax, runners, and the Actions admin settings.
+- [Gitea Actions documentation](https://docs.gitea.com/usage/actions) — upstream reference for workflow syntax, runners, and the Actions admin settings.
 
 ## What you get on StartOS
 

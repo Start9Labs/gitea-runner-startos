@@ -4,7 +4,7 @@
 
 # Gitea Runner on StartOS
 
-> **Upstream docs:** <https://docs.gitea.com/usage/actions/overview>
+> **Upstream docs:** <https://docs.gitea.com/usage/actions>
 >
 > Everything not listed in this document behaves identically to upstream gitea-runner. If a feature, setting, or behavior is not mentioned here, the upstream documentation is accurate and fully applicable.
 
