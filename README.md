@@ -37,7 +37,7 @@
 |---|---|---|
 | Image | The `gitea-runner` binary plus a Docker/Podman socket you supply | Custom image: Debian + rootless **Podman**, with the `gitea-runner` binary copied from the official `gitea/runner` image |
 | Architectures | depends on host | x86_64, aarch64 |
-| Job engine | an external Docker/Podman daemon you wire up | a rootless Podman engine bundled inside the service (`nestedRuntime`) |
+| Job engine | an external Docker/Podman daemon you wire up | a rootless Podman engine bundled inside the service (`userspaceFilesystems` + `virtualNetworking`) |
 | Entrypoint | `gitea-runner daemon` | a wrapper that starts the Podman socket, writes your configured labels into `config.yaml`, registers once, then runs `gitea-runner daemon` |
 
 Upstream expects you to provide a container engine; this package bundles a rootless Podman engine so each CI job is sandboxed without privileged Docker-in-Docker.
@@ -68,7 +68,7 @@ Upstream `gitea-runner` is configured through `config.yaml` and `register` flags
 | Runner name | "Configure" action |
 | Labels | "Configure" action — written into `config.yaml`, where gitea-runner reads them |
 | Concurrent jobs | "Configure" action |
-| Forge URL | Always the local Gitea (`http://gitea.startos:3000`) |
+| Forge URL | Always the local Gitea, resolved from its HTTP interface over the internal LXC bridge |
 
 ## Network Access and Interfaces
 

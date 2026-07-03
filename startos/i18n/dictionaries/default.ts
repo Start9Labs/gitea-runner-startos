@@ -18,6 +18,7 @@ const dict = {
   'Register this runner with the Gitea on this device. Saving re-registers on the next restart, so provide a fresh registration token each time.': 14,
   Saved: 15,
   'Runner configuration saved. Restart the service to (re)register with these settings.': 16,
+  'Gitea is not yet reachable on the internal network. The runner will connect once its Gitea dependency is running.': 17,
 }
 
 export type I18nKey = keyof typeof dict

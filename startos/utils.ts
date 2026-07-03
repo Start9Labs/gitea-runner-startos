@@ -7,11 +7,6 @@ import { sdk } from './sdk'
 export const MIN_MEMORY_BYTES = 2 * 1024 ** 3 // 2 GiB
 export const MIN_CPU_CORES = 2
 
-// ---- Local forge ----
-// When the runner is pointed at the Gitea on this same device, it's reachable
-// on the internal StartOS network here (see gitea-startos interfaces/utils).
-export const LOCAL_FORGE_URL = 'http://gitea.startos:3000'
-
 // ---- Paths (inside the service container) ----
 export const DATA_DIR = '/data'
 
