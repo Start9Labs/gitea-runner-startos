@@ -1,13 +1,16 @@
 import { cpus, totalmem } from 'os'
-import {
-  httpInterfaceId,
-  mainHostId as giteaHostId,
-} from 'gitea-startos/startos/utils'
+import { mainHostId as giteaHostId, uiPort } from 'gitea-startos/startos/utils'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import { storeJson } from './fileModels/store.json'
 import { runnerState } from './fileModels/runnerState'
-import { DATA_DIR, MIN_CPU_CORES, MIN_MEMORY_BYTES, mount } from './utils'
+import {
+  bridgeAddress,
+  DATA_DIR,
+  MIN_CPU_CORES,
+  MIN_MEMORY_BYTES,
+  mount,
+} from './utils'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   // A CI runner runs full builds (compilers, image pulls, nested containers)
@@ -24,25 +27,17 @@ export const main = sdk.setupMain(async ({ effects }) => {
   if (!store) throw new Error(i18n('Store not found'))
 
   // The runner connects to its Gitea dependency over the internal LXC bridge.
-  // Resolve Gitea's `http` interface to its stable bridge URL once, outside the
-  // daemon chain; `.const()` re-runs main only if that binding is added/removed,
-  // so the daemon env gets a plain string instead of the retired `gitea.startos`
-  // DNS name (which made the runner watch the Tor/DNS layer).
-  const forgeUrl = await sdk.host
-    .get(effects, { hostId: giteaHostId, packageId: 'gitea' }, (host) => {
-      const iface =
-        host &&
-        Object.values(host.bindings)
-          .flatMap((b) => Object.values(b.interfaces))
-          .find((i) => i.id === httpInterfaceId)
-      return iface
-        ? iface.addressInfo
-            .filter({ kind: 'bridge', predicate: (h) => !h.ssl })
-            .format('urlstring')[0]
-        : undefined
-    })
-    .const()
-  if (!forgeUrl)
+  // The mapped bridge address (`10.0.3.1:<assigned http port>`) only changes
+  // when the address itself does, so this `.const()` restarts main exactly on
+  // Gitea install/uninstall/port-change and never on Gitea updates. The
+  // `kind:'running'` + primary-health-check dependency means Gitea is up when
+  // main starts, so the address resolves and the runner never sees the throw.
+  const forgeAddr = await bridgeAddress(effects, {
+    packageId: 'gitea',
+    hostId: giteaHostId,
+    internalPort: uiPort,
+  }).const()
+  if (!forgeAddr)
     throw new Error(
       i18n(
         'Gitea is not yet reachable on the internal network. The runner will connect once its Gitea dependency is running.',
@@ -78,7 +73,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         command: ['/usr/local/bin/entrypoint.sh'],
         user: 'app',
         env: {
-          INSTANCE_URL: forgeUrl,
+          INSTANCE_URL: `http://${forgeAddr}`,
           RUNNER_TOKEN: store.registrationToken,
           RUNNER_NAME: store.runnerName || 'startos-runner',
           RUNNER_LABELS: store.labels,
