@@ -3,11 +3,11 @@ import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 export const current = VersionInfo.of({
   version: '2.0.0:1',
   releaseNotes: {
-    en_US: 'Internal updates (start-sdk 2.0.x)',
-    es_ES: 'Actualizaciones internas (start-sdk 2.0.x)',
-    de_DE: 'Interne Aktualisierungen (start-sdk 2.0.x)',
-    pl_PL: 'Aktualizacje wewnętrzne (start-sdk 2.0.x)',
-    fr_FR: 'Mises à jour internes (start-sdk 2.0.x)',
+    en_US: `Installs git in the runner image so workflow steps using \`uses:\` (including actions/checkout) work — they previously failed on a missing git executable. Internal updates (start-sdk 2.0.x).`,
+    es_ES: `Instala git en la imagen del ejecutor para que los pasos de flujo de trabajo que usan \`uses:\` (incluido actions/checkout) funcionen; antes fallaban por falta del ejecutable git. Actualizaciones internas (start-sdk 2.0.x).`,
+    de_DE: `Installiert git im Runner-Image, damit Workflow-Schritte mit \`uses:\` (einschließlich actions/checkout) funktionieren – zuvor schlugen sie mangels git-Programm fehl. Interne Aktualisierungen (start-sdk 2.0.x).`,
+    pl_PL: `Instaluje git w obrazie runnera, aby kroki przepływu pracy używające \`uses:\` (w tym actions/checkout) działały — wcześniej kończyły się błędem z powodu braku programu git. Aktualizacje wewnętrzne (start-sdk 2.0.x).`,
+    fr_FR: `Installe git dans l’image du runner pour que les étapes de workflow utilisant \`uses:\` (dont actions/checkout) fonctionnent — elles échouaient auparavant faute de l’exécutable git. Mises à jour internes (start-sdk 2.0.x).`,
   },
   migrations: {
     // No data migration: the store schema is unchanged across this bump.
