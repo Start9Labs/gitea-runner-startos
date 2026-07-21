@@ -1,11 +1,12 @@
 import { cpus, totalmem } from 'os'
+import { mainHostId as giteaHostId, uiPort } from 'gitea-startos/startos/utils'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import { storeJson } from './fileModels/store.json'
 import { runnerState } from './fileModels/runnerState'
 import {
+  bridgeAddress,
   DATA_DIR,
-  LOCAL_FORGE_URL,
   MIN_CPU_CORES,
   MIN_MEMORY_BYTES,
   mount,
@@ -25,7 +26,25 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const store = await storeJson.read().const(effects)
   if (!store) throw new Error(i18n('Store not found'))
 
-  const subcontainer = await sdk.SubContainer.of(
+  // The runner connects to its Gitea dependency over the internal LXC bridge.
+  // The mapped bridge address (`10.0.3.1:<assigned http port>`) only changes
+  // when the address itself does, so this `.const()` restarts main exactly on
+  // Gitea install/uninstall/port-change and never on Gitea updates. The
+  // `kind:'running'` + primary-health-check dependency means Gitea is up when
+  // main starts, so the address resolves and the runner never sees the throw.
+  const forgeAddr = await bridgeAddress(effects, {
+    packageId: 'gitea',
+    hostId: giteaHostId,
+    internalPort: uiPort,
+  }).const()
+  if (!forgeAddr)
+    throw new Error(
+      i18n(
+        'Gitea is not yet reachable on the internal network. The runner will connect once its Gitea dependency is running.',
+      ),
+    )
+
+  const subcontainer = sdk.SubContainer.of(
     effects,
     { imageId: 'main' },
     mount,
@@ -54,7 +73,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         command: ['/usr/local/bin/entrypoint.sh'],
         user: 'app',
         env: {
-          INSTANCE_URL: LOCAL_FORGE_URL,
+          INSTANCE_URL: `http://${forgeAddr}`,
           RUNNER_TOKEN: store.registrationToken,
           RUNNER_NAME: store.runnerName || 'startos-runner',
           RUNNER_LABELS: store.labels,

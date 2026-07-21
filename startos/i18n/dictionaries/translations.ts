@@ -19,6 +19,7 @@ export default {
     14: 'Registre este ejecutor con el Gitea de este dispositivo. Al guardar se vuelve a registrar en el próximo reinicio, así que proporcione un token de registro nuevo cada vez.',
     15: 'Guardado',
     16: 'Configuración del ejecutor guardada. Reinicie el servicio para volver a registrar con estos ajustes.',
+    17: 'Gitea aún no es accesible en la red interna. El ejecutor se conectará una vez que su dependencia de Gitea esté en ejecución.',
   },
   de_DE: {
     0: 'Dieses Gerät erfüllt nicht die Mindestanforderungen zum Ausführen von CI-Aufträgen (2 GiB RAM und 2 CPU-Kerne).',
@@ -38,6 +39,7 @@ export default {
     14: 'Registrieren Sie diesen Runner beim Gitea auf diesem Gerät. Beim Speichern erfolgt beim nächsten Neustart eine erneute Registrierung — geben Sie daher jedes Mal ein neues Registrierungs-Token an.',
     15: 'Gespeichert',
     16: 'Runner-Konfiguration gespeichert. Starten Sie den Dienst neu, um sich mit diesen Einstellungen erneut zu registrieren.',
+    17: 'Gitea ist im internen Netzwerk noch nicht erreichbar. Der Runner verbindet sich, sobald seine Gitea-Abhängigkeit läuft.',
   },
   pl_PL: {
     0: 'To urządzenie nie spełnia minimalnych wymagań do uruchamiania zadań CI (2 GiB RAM i 2 rdzenie CPU).',
@@ -57,6 +59,7 @@ export default {
     14: 'Zarejestruj ten runner w Gitea na tym urządzeniu. Zapisanie powoduje ponowną rejestrację przy następnym uruchomieniu, więc podawaj nowy token rejestracji za każdym razem.',
     15: 'Zapisano',
     16: 'Konfiguracja runnera zapisana. Uruchom ponownie usługę, aby ponownie zarejestrować z tymi ustawieniami.',
+    17: 'Gitea nie jest jeszcze osiągalne w sieci wewnętrznej. Runner połączy się, gdy jego zależność Gitea będzie uruchomiona.',
   },
   fr_FR: {
     0: 'Cet appareil ne répond pas aux exigences minimales pour exécuter des tâches CI (2 Gio de RAM et 2 cœurs de CPU).',
@@ -76,5 +79,6 @@ export default {
     14: "Enregistrez cet exécuteur auprès du Gitea de cet appareil. L'enregistrement se refait au prochain redémarrage, fournissez donc un nouveau jeton d'enregistrement à chaque fois.",
     15: 'Enregistré',
     16: "Configuration de l'exécuteur enregistrée. Redémarrez le service pour vous réenregistrer avec ces paramètres.",
+    17: "Gitea n'est pas encore accessible sur le réseau interne. L'exécuteur se connectera une fois que sa dépendance Gitea sera en cours d'exécution.",
   },
 } satisfies Record<string, LangDict>

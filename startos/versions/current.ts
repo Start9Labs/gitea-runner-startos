@@ -1,43 +1,53 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '2.0.0:0',
+  version: '2.1.0:0',
   releaseNotes: {
-    en_US: `Updated Gitea Runner to 2.0.0.
+    en_US: `Updated Gitea Runner to 2.1.0.
 
-**Breaking:** the secrets \`DOCKER_USERNAME\` / \`DOCKER_PASSWORD\` are no longer used implicitly as Docker image-pull credentials. Workflows that relied on this must switch to explicit \`container.credentials\` (or \`docker login\` on the runner).
+- Honors \`GITEA_RUNNER_LABELS\` on daemon start and accepts labels containing a colon.
+- Adds a \`--token-file\` flag to the \`register\` command.
+- Adds a \`bug-report\` subcommand, \`exec --eventpath\`, and \`runner.set_act_env\`.
+- Ignores blank lines and decodes UTF-16 in runner env files.
+- Migrates the package to start-sdk 2.0 (requires StartOS 0.4.0-beta.10 or later).
 
-**Highlights:** complete runner-side job cancellation, per-job \`timeout-minutes\` and \`continue-on-error\`, shallow clones of action repositories, an optional \`post_task_script\` hook, \`ssh://\` action URLs, IPv6 network options, job-summary upload, and numerous cancellation/cleanup fixes (Docker CLI bumped to v29.6.0).
+Full release notes: https://gitea.com/gitea/runner/releases/tag/v2.1.0`,
+    es_ES: `Actualiza Gitea Runner a 2.1.0.
 
-Full changelog: https://gitea.com/gitea/runner/releases/tag/v2.0.0`,
-    es_ES: `Se actualizó Gitea Runner a 2.0.0.
+- Respeta \`GITEA_RUNNER_LABELS\` al iniciar el demonio y acepta etiquetas que contengan dos puntos.
+- Añade la opción \`--token-file\` al comando \`register\`.
+- Añade el subcomando \`bug-report\`, \`exec --eventpath\` y \`runner.set_act_env\`.
+- Ignora las líneas en blanco y decodifica UTF-16 en los archivos de entorno del runner.
+- Migra el paquete a start-sdk 2.0 (requiere StartOS 0.4.0-beta.10 o posterior).
 
-**Cambio incompatible:** los secretos \`DOCKER_USERNAME\` / \`DOCKER_PASSWORD\` ya no se usan implícitamente como credenciales para descargar imágenes de Docker. Los flujos de trabajo que dependían de esto deben pasar a \`container.credentials\` explícitas (o \`docker login\` en el ejecutor).
+Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v2.1.0`,
+    de_DE: `Aktualisiert Gitea Runner auf 2.1.0.
 
-**Novedades:** cancelación completa de trabajos en el ejecutor, \`timeout-minutes\` y \`continue-on-error\` por trabajo, clones superficiales de los repositorios de acciones, un hook opcional \`post_task_script\`, URLs de acciones \`ssh://\`, opciones de red IPv6, subida del resumen de trabajo y numerosas correcciones de cancelación/limpieza (Docker CLI actualizado a v29.6.0).
+- Berücksichtigt \`GITEA_RUNNER_LABELS\` beim Start des Daemons und akzeptiert Labels mit Doppelpunkt.
+- Fügt dem Befehl \`register\` die Option \`--token-file\` hinzu.
+- Ergänzt den Unterbefehl \`bug-report\`, \`exec --eventpath\` und \`runner.set_act_env\`.
+- Ignoriert Leerzeilen und dekodiert UTF-16 in den Umgebungsdateien des Runners.
+- Stellt das Paket auf start-sdk 2.0 um (erfordert StartOS 0.4.0-beta.10 oder neuer).
 
-Registro de cambios completo: https://gitea.com/gitea/runner/releases/tag/v2.0.0`,
-    de_DE: `Gitea Runner auf 2.0.0 aktualisiert.
+Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v2.1.0`,
+    pl_PL: `Aktualizuje Gitea Runner do 2.1.0.
 
-**Breaking Change:** Die Secrets \`DOCKER_USERNAME\` / \`DOCKER_PASSWORD\` werden nicht mehr implizit als Anmeldedaten zum Abrufen von Docker-Images verwendet. Workflows, die sich darauf verließen, müssen auf explizite \`container.credentials\` (oder \`docker login\` auf dem Runner) umstellen.
+- Uwzględnia \`GITEA_RUNNER_LABELS\` przy starcie demona i akceptuje etykiety zawierające dwukropek.
+- Dodaje flagę \`--token-file\` do polecenia \`register\`.
+- Dodaje podpolecenie \`bug-report\`, \`exec --eventpath\` oraz \`runner.set_act_env\`.
+- Ignoruje puste wiersze i dekoduje UTF-16 w plikach środowiskowych runnera.
+- Przenosi pakiet na start-sdk 2.0 (wymaga StartOS 0.4.0-beta.10 lub nowszego).
 
-**Highlights:** vollständige Job-Abbruchbehandlung auf der Runner-Seite, \`timeout-minutes\` und \`continue-on-error\` pro Job, flache Klone der Action-Repositories, ein optionaler \`post_task_script\`-Hook, \`ssh://\`-Action-URLs, IPv6-Netzwerkoptionen, Hochladen der Job-Zusammenfassung sowie zahlreiche Abbruch-/Aufräum-Fehlerbehebungen (Docker CLI auf v29.6.0 aktualisiert).
+Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v2.1.0`,
+    fr_FR: `Met à jour Gitea Runner vers 2.1.0.
 
-Vollständiges Änderungsprotokoll: https://gitea.com/gitea/runner/releases/tag/v2.0.0`,
-    pl_PL: `Zaktualizowano Gitea Runner do 2.0.0.
+- Prend en compte \`GITEA_RUNNER_LABELS\` au démarrage du démon et accepte les libellés contenant un deux-points.
+- Ajoute l'option \`--token-file\` à la commande \`register\`.
+- Ajoute la sous-commande \`bug-report\`, \`exec --eventpath\` et \`runner.set_act_env\`.
+- Ignore les lignes vides et décode l'UTF-16 dans les fichiers d'environnement du runner.
+- Fait passer le paquet à start-sdk 2.0 (nécessite StartOS 0.4.0-beta.10 ou une version ultérieure).
 
-**Zmiana niezgodna wstecznie:** sekrety \`DOCKER_USERNAME\` / \`DOCKER_PASSWORD\` nie są już niejawnie używane jako dane logowania do pobierania obrazów Docker. Przepływy pracy, które na tym polegały, muszą przejść na jawne \`container.credentials\` (lub \`docker login\` na runnerze).
-
-**Najważniejsze zmiany:** pełna obsługa anulowania zadań po stronie runnera, \`timeout-minutes\` i \`continue-on-error\` na poziomie zadania, płytkie klony repozytoriów akcji, opcjonalny hook \`post_task_script\`, adresy akcji \`ssh://\`, opcje sieci IPv6, przesyłanie podsumowania zadania oraz liczne poprawki anulowania/sprzątania (Docker CLI podbity do v29.6.0).
-
-Pełny dziennik zmian: https://gitea.com/gitea/runner/releases/tag/v2.0.0`,
-    fr_FR: `Mise à jour de Gitea Runner vers 2.0.0.
-
-**Changement incompatible :** les secrets \`DOCKER_USERNAME\` / \`DOCKER_PASSWORD\` ne sont plus utilisés implicitement comme identifiants pour récupérer les images Docker. Les workflows qui en dépendaient doivent passer à des \`container.credentials\` explicites (ou \`docker login\` sur l'exécuteur).
-
-**Points forts :** gestion complète de l'annulation des tâches côté exécuteur, \`timeout-minutes\` et \`continue-on-error\` par tâche, clones superficiels des dépôts d'actions, un hook optionnel \`post_task_script\`, des URL d'action \`ssh://\`, des options réseau IPv6, l'envoi du résumé de tâche et de nombreuses corrections d'annulation/nettoyage (Docker CLI mis à jour vers v29.6.0).
-
-Journal des modifications complet : https://gitea.com/gitea/runner/releases/tag/v2.0.0`,
+Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v2.1.0`,
   },
   migrations: {
     // No data migration: the store schema is unchanged across this bump.

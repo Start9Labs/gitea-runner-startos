@@ -35,9 +35,9 @@
 
 | Aspect | Standard install | StartOS |
 |---|---|---|
-| Image | The `gitea-runner` binary plus a Docker/Podman socket you supply | Custom image: Debian + rootless **Podman**, with the `gitea-runner` binary copied from the official `gitea/runner` image |
+| Image | The `gitea-runner` binary plus a Docker/Podman socket you supply | Custom image: Debian + rootless **Podman** and **git** (used to fetch `uses:` actions), with the `gitea-runner` binary copied from the official `gitea/runner` image |
 | Architectures | depends on host | x86_64, aarch64 |
-| Job engine | an external Docker/Podman daemon you wire up | a rootless Podman engine bundled inside the service (`nestedRuntime`) |
+| Job engine | an external Docker/Podman daemon you wire up | a rootless Podman engine bundled inside the service (`userspaceFilesystems` + `virtualNetworking`) |
 | Entrypoint | `gitea-runner daemon` | a wrapper that starts the Podman socket, writes your configured labels into `config.yaml`, registers once, then runs `gitea-runner daemon` |
 
 Upstream expects you to provide a container engine; this package bundles a rootless Podman engine so each CI job is sandboxed without privileged Docker-in-Docker.
@@ -68,7 +68,7 @@ Upstream `gitea-runner` is configured through `config.yaml` and `register` flags
 | Runner name | "Configure" action |
 | Labels | "Configure" action — written into `config.yaml`, where gitea-runner reads them |
 | Concurrent jobs | "Configure" action |
-| Forge URL | Always the local Gitea (`http://gitea.startos:3000`) |
+| Forge URL | Always the local Gitea, resolved from its HTTP interface over the internal LXC bridge |
 
 ## Network Access and Interfaces
 
@@ -89,6 +89,8 @@ Upstream `gitea-runner` is configured through `config.yaml` and `register` flags
 ## Job Execution and Multi-Arch
 
 Each job runs in its own container via the bundled rootless Podman engine. StartOS registers QEMU `binfmt` handlers host-wide, so a job targeting a foreign architecture (`arm64`, `riscv64`, …) runs under emulation automatically — no per-container setup. Emulated builds are much slower than native; for regular multi-arch work, prefer a native runner per architecture and reserve emulation for architectures you have no native hardware for.
+
+The runner image ships `git`, which the daemon shells out to when fetching `uses:` actions (such as `actions/checkout`); without it every `uses:` step would fail at the action fetch. The first job for a given image tag also pulls that image (~1 GB for the default `ubuntu-latest`), so its initial **Set up job** step can take a minute or two before the image is cached locally.
 
 ## Backups and Restore
 
@@ -134,7 +136,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions and the developmen
 
 ```yaml
 package_id: gitea-runner
-image: custom (Debian + rootless Podman + gitea-runner)
+image: custom (Debian + rootless Podman + git + gitea-runner)
 architectures: [x86_64, aarch64]
 volumes:
   main: /data
