@@ -8,7 +8,7 @@ import { sdk } from './sdk'
 export const setDependencies = sdk.setupDependencies(async ({ effects }) => ({
   gitea: {
     kind: 'running',
-    versionRange: '>=1.26.4:1',
+    versionRange: '>=1.27.0:3',
     healthChecks: ['primary'],
   },
 }))

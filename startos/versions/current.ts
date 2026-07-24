@@ -1,7 +1,7 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '2.1.0:0',
+  version: '2.1.0:1',
   releaseNotes: {
     en_US: `Updated Gitea Runner to 2.1.0.
 
