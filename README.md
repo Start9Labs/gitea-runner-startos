@@ -33,22 +33,22 @@
 
 ## Image and Container Runtime
 
-| Aspect | Standard install | StartOS |
-|---|---|---|
-| Image | The `gitea-runner` binary plus a Docker/Podman socket you supply | Custom image: Debian + rootless **Podman** and **git** (used to fetch `uses:` actions), with the `gitea-runner` binary copied from the official `gitea/runner` image |
-| Architectures | depends on host | x86_64, aarch64 |
-| Job engine | an external Docker/Podman daemon you wire up | a rootless Podman engine bundled inside the service (`userspaceFilesystems` + `virtualNetworking`) |
-| Entrypoint | `gitea-runner daemon` | a wrapper that starts the Podman socket, writes your configured labels into `config.yaml`, registers once, then runs `gitea-runner daemon` |
+| Aspect        | Standard install                                                 | StartOS                                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Image         | The `gitea-runner` binary plus a Docker/Podman socket you supply | Custom image: Debian + rootless **Podman** and **git** (used to fetch `uses:` actions), with the `gitea-runner` binary copied from the official `gitea/runner` image |
+| Architectures | depends on host                                                  | x86_64, aarch64                                                                                                                                                      |
+| Job engine    | an external Docker/Podman daemon you wire up                     | a rootless Podman engine bundled inside the service (`userspaceFilesystems` + `virtualNetworking`)                                                                   |
+| Entrypoint    | `gitea-runner daemon`                                            | a wrapper that starts the Podman socket, writes your configured labels into `config.yaml`, registers once, then runs `gitea-runner daemon`                           |
 
 Upstream expects you to provide a container engine; this package bundles a rootless Podman engine so each CI job is sandboxed without privileged Docker-in-Docker.
 
 ## Volume and Data Layout
 
-| Aspect | StartOS |
-|---|---|
-| Primary volume | Single managed volume `main`, mounted at `/data` |
+| Aspect              | StartOS                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primary volume      | Single managed volume `main`, mounted at `/data`                                                                                            |
 | Runner working area | `/data/runner` — the generated `config.yaml`, the `.runner` registration state, and the Podman layer store (so job images survive restarts) |
-| StartOS settings | `/data/store.json` — registration token, runner name, labels, and concurrency (see [Configuration Management](#configuration-management)) |
+| StartOS settings    | `/data/store.json` — registration token, runner name, labels, and concurrency (see [Configuration Management](#configuration-management))   |
 
 ## Installation and First-Run Flow
 
@@ -62,13 +62,13 @@ The runner does nothing until it is connected to a Gitea instance.
 
 Upstream `gitea-runner` is configured through `config.yaml` and `register` flags. On StartOS you set the connection through the **Configure** action; values persist in `store.json` and are applied on each start.
 
-| Setting | Managed via |
-|---|---|
-| Registration token | "Configure" action |
-| Runner name | "Configure" action |
-| Labels | "Configure" action — written into `config.yaml`, where gitea-runner reads them |
-| Concurrent jobs | "Configure" action |
-| Forge URL | Always the local Gitea, resolved from its HTTP interface over the internal LXC bridge |
+| Setting            | Managed via                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| Registration token | "Configure" action                                                                    |
+| Runner name        | "Configure" action                                                                    |
+| Labels             | "Configure" action — written into `config.yaml`, where gitea-runner reads them        |
+| Concurrent jobs    | "Configure" action                                                                    |
+| Forge URL          | Always the local Gitea, resolved from its HTTP interface over the internal LXC bridge |
 
 ## Network Access and Interfaces
 
@@ -76,9 +76,9 @@ Upstream `gitea-runner` is configured through `config.yaml` and `register` flags
 
 ## Actions (StartOS UI)
 
-| Action | Visibility | Availability | Purpose |
-|---|---|---|---|
-| Configure | Visible | Any | Set the registration token, runner name, labels, and concurrency |
+| Action    | Visibility | Availability | Purpose                                                          |
+| --------- | ---------- | ------------ | ---------------------------------------------------------------- |
+| Configure | Visible    | Any          | Set the registration token, runner name, labels, and concurrency |
 
 ### Configure
 
@@ -94,24 +94,24 @@ The runner image ships `git`, which the daemon shells out to when fetching `uses
 
 ## Backups and Restore
 
-| Aspect | StartOS |
-|---|---|
-| Scope | Full `/data` volume — `store.json`, the runner config, registration state, and cached job images |
+| Aspect  | StartOS                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------ |
+| Scope   | Full `/data` volume — `store.json`, the runner config, registration state, and cached job images             |
 | Restore | The volume is fully restored before the service starts; the runner reconnects with its existing registration |
 
 ## Health Checks
 
-| Aspect | StartOS |
-|---|---|
-| Method | Reflects registration state, displayed as "Runner" |
-| Grace period | 60 seconds |
-| Behavior | Healthy once the runner has registered (its `.runner` state file exists); otherwise prompts you to run **Configure** |
+| Aspect       | StartOS                                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Method       | Reflects registration state, displayed as "Runner"                                                                   |
+| Grace period | 60 seconds                                                                                                           |
+| Behavior     | Healthy once the runner has registered (its `.runner` state file exists); otherwise prompts you to run **Configure** |
 
 ## Dependencies
 
-| Dependency | Required? | Purpose |
-|---|---|---|
-| **Gitea** | Required (running) | The forge this runner serves. The runner registers and long-polls over Gitea's HTTP API, so Gitea's web-interface health check must be passing. |
+| Dependency | Required?          | Purpose                                                                                                                                         |
+| ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gitea**  | Required (running) | The forge this runner serves. The runner registers and long-polls over Gitea's HTTP API, so Gitea's web-interface health check must be passing. |
 
 This runner serves only the Gitea on the same device — there is no remote-forge mode.
 
