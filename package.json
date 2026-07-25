@@ -6,7 +6,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@start9labs/start-sdk": "2.0.7",
+    "@start9labs/start-sdk": "2.0.9",
     "gitea-startos": "github:Start9Labs/gitea-startos#next"
   },
   "devDependencies": {

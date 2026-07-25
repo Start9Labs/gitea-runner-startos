@@ -4,13 +4,7 @@ import { i18n } from './i18n'
 import { sdk } from './sdk'
 import { storeJson } from './fileModels/store.json'
 import { runnerState } from './fileModels/runnerState'
-import {
-  bridgeAddress,
-  DATA_DIR,
-  MIN_CPU_CORES,
-  MIN_MEMORY_BYTES,
-  mount,
-} from './utils'
+import { DATA_DIR, MIN_CPU_CORES, MIN_MEMORY_BYTES, mount } from './utils'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   // A CI runner runs full builds (compilers, image pulls, nested containers)
@@ -32,11 +26,14 @@ export const main = sdk.setupMain(async ({ effects }) => {
   // Gitea install/uninstall/port-change and never on Gitea updates. The
   // `kind:'running'` + primary-health-check dependency means Gitea is up when
   // main starts, so the address resolves and the runner never sees the throw.
-  const forgeAddr = await bridgeAddress(effects, {
-    packageId: 'gitea',
-    hostId: giteaHostId,
-    internalPort: uiPort,
-  }).const()
+  const forgeAddr = await sdk.host
+    .getBridgeAddress(effects, {
+      packageId: 'gitea',
+      hostId: giteaHostId,
+      internalPort: uiPort,
+      ssl: false,
+    })
+    .const()
   if (!forgeAddr)
     throw new Error(
       i18n(
