@@ -21,8 +21,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
   if (!store) throw new Error(i18n('Store not found'))
 
   // The runner connects to its Gitea dependency over the internal LXC bridge.
-  // The mapped bridge address (`10.0.3.1:<assigned http port>`) only changes
-  // when the address itself does, so this `.const()` restarts main exactly on
+  // The bridge address (`10.0.3.1:<assigned http port>`) only changes
+  // when Gitea's binding does, so this `.const()` restarts main exactly on
   // Gitea install/uninstall/port-change and never on Gitea updates. The
   // `kind:'running'` + primary-health-check dependency means Gitea is up when
   // main starts, so the address resolves and the runner never sees the throw.
