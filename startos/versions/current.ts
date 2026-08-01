@@ -1,48 +1,48 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '2.3.0:0',
+  version: '3.0.0:0',
   releaseNotes: {
-    en_US: `Updated Gitea Runner to 2.3.0.
+    en_US: `Updated Gitea Runner to 3.0.0.
 
-- Job logs now open with a "Set up job" section and report the runner's name, environment and workspace.
-- Docker actions run their pre- and post-entrypoint steps, and \`container.options\` accepts \`--platform\` and \`--pull\`.
-- A cancelled step is reported as an interruption rather than a failure, and leftover service containers are cleaned up when job setup fails.
-- Security updates to the bundled Go networking and telemetry libraries.
+- The stock \`actions/upload-artifact\` and \`actions/download-artifact\` v4.4.0 and newer now work: the runner serves the cache service v2 API and patches the official actions to reach it, so the \`gitea-upload-artifact\` fork is no longer needed.
+- \`container.options\` that reach the runner host (such as joining its process namespace) are now dropped with a warning unless \`container.privileged\` is on. This package runs each job unprivileged, so a workflow relying on those options will see them ignored.
+- New job hooks (\`job_started\`, \`job_completed\`), proxy variables passed through to jobs and services, and masking of secrets that reach the log in an encoded form.
+- Fixes: per-job container networks are no longer leaked, symlinked container paths resolve correctly, and several panics were fixed.
 
-Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v2.3.0 and https://gitea.com/gitea/runner/releases/tag/v2.2.0`,
-    es_ES: `Gitea Runner actualizado a 2.3.0.
+Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
+    es_ES: `Gitea Runner actualizado a 3.0.0.
 
-- Los registros de las tareas comienzan ahora con una sección «Set up job» e indican el nombre del ejecutor, su entorno y su espacio de trabajo.
-- Las acciones Docker ejecutan sus pasos de pre y post entrypoint, y \`container.options\` admite \`--platform\` y \`--pull\`.
-- Un paso cancelado se informa como interrupción y no como fallo, y los contenedores de servicio sobrantes se limpian cuando falla la preparación de la tarea.
-- Actualizaciones de seguridad de las bibliotecas Go de red y telemetría incluidas.
+- Las acciones oficiales \`actions/upload-artifact\` y \`actions/download-artifact\` v4.4.0 y posteriores ya funcionan: el ejecutor sirve la API del servicio de caché v2 y ajusta las acciones oficiales para que la utilicen, por lo que ya no hace falta la bifurcación \`gitea-upload-artifact\`.
+- Las opciones de \`container.options\` que alcanzan el anfitrión del ejecutor (por ejemplo, unirse a su espacio de nombres de procesos) ahora se descartan con una advertencia salvo que \`container.privileged\` esté activado. Este paquete ejecuta cada tarea sin privilegios, así que un flujo de trabajo que dependa de esas opciones las verá ignoradas.
+- Nuevos ganchos de tarea (\`job_started\`, \`job_completed\`), variables de proxy propagadas a tareas y servicios, y enmascarado de secretos que llegan al registro en forma codificada.
+- Correcciones: ya no se filtran las redes de contenedor por tarea, las rutas de contenedor con enlaces simbólicos se resuelven correctamente y se corrigieron varios pánicos.
 
-Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v2.3.0 y https://gitea.com/gitea/runner/releases/tag/v2.2.0`,
-    de_DE: `Gitea Runner auf 2.3.0 aktualisiert.
+Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
+    de_DE: `Gitea Runner auf 3.0.0 aktualisiert.
 
-- Job-Protokolle beginnen jetzt mit einem Abschnitt „Set up job“ und nennen Name, Umgebung und Arbeitsverzeichnis des Runners.
-- Docker-Aktionen führen ihre Pre- und Post-Entrypoint-Schritte aus, und \`container.options\` akzeptiert \`--platform\` und \`--pull\`.
-- Ein abgebrochener Schritt wird als Unterbrechung statt als Fehler gemeldet, und übrig gebliebene Service-Container werden aufgeräumt, wenn die Job-Einrichtung fehlschlägt.
-- Sicherheitsaktualisierungen der mitgelieferten Go-Netzwerk- und Telemetriebibliotheken.
+- Die originalen Aktionen \`actions/upload-artifact\` und \`actions/download-artifact\` ab v4.4.0 funktionieren jetzt: Der Runner stellt die Cache-Service-v2-API bereit und passt die offiziellen Aktionen so an, dass sie diese erreichen — der Fork \`gitea-upload-artifact\` wird nicht mehr benötigt.
+- \`container.options\`, die den Runner-Host erreichen (etwa der Beitritt zu dessen Prozess-Namensraum), werden jetzt mit einer Warnung verworfen, sofern \`container.privileged\` nicht aktiviert ist. Dieses Paket führt jeden Auftrag unprivilegiert aus, daher werden solche Optionen in Workflows ignoriert.
+- Neue Job-Hooks (\`job_started\`, \`job_completed\`), Proxy-Variablen werden an Aufträge und Dienste weitergereicht, und codiert im Protokoll auftauchende Geheimnisse werden maskiert.
+- Fehlerbehebungen: Container-Netzwerke einzelner Aufträge bleiben nicht mehr zurück, Pfade mit symbolischen Links im Container werden korrekt aufgelöst, und mehrere Panics wurden behoben.
 
-Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v2.3.0 und https://gitea.com/gitea/runner/releases/tag/v2.2.0`,
-    pl_PL: `Zaktualizowano Gitea Runner do 2.3.0.
+Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
+    pl_PL: `Zaktualizowano Gitea Runner do 3.0.0.
 
-- Dzienniki zadań zaczynają się teraz sekcją „Set up job” i podają nazwę runnera, jego środowisko oraz katalog roboczy.
-- Akcje Docker wykonują kroki pre- i post-entrypoint, a \`container.options\` przyjmuje \`--platform\` i \`--pull\`.
-- Anulowany krok jest zgłaszany jako przerwanie, a nie błąd, a pozostałe kontenery usług są usuwane, gdy przygotowanie zadania się nie powiedzie.
-- Aktualizacje bezpieczeństwa dołączonych bibliotek sieciowych i telemetrycznych Go.
+- Oryginalne akcje \`actions/upload-artifact\` i \`actions/download-artifact\` w wersji 4.4.0 i nowszych już działają: runner udostępnia API usługi pamięci podręcznej v2 i dostosowuje oficjalne akcje, aby z niego korzystały, więc fork \`gitea-upload-artifact\` nie jest już potrzebny.
+- Opcje \`container.options\` sięgające hosta runnera (np. dołączenie do jego przestrzeni nazw procesów) są teraz odrzucane z ostrzeżeniem, chyba że włączono \`container.privileged\`. Ten pakiet uruchamia każde zadanie bez uprawnień, więc przepływ pracy zależny od takich opcji zobaczy je zignorowane.
+- Nowe haki zadań (\`job_started\`, \`job_completed\`), zmienne proxy przekazywane do zadań i usług oraz maskowanie sekretów trafiających do dziennika w postaci zakodowanej.
+- Poprawki: sieci kontenerów poszczególnych zadań nie są już porzucane, ścieżki z dowiązaniami symbolicznymi w kontenerze są poprawnie rozwiązywane i naprawiono kilka panik.
 
-Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v2.3.0 i https://gitea.com/gitea/runner/releases/tag/v2.2.0`,
-    fr_FR: `Gitea Runner mis à jour vers 2.3.0.
+Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
+    fr_FR: `Gitea Runner mis à jour vers 3.0.0.
 
-- Les journaux de tâches commencent désormais par une section « Set up job » et indiquent le nom de l'exécuteur, son environnement et son espace de travail.
-- Les actions Docker exécutent leurs étapes pre- et post-entrypoint, et \`container.options\` accepte \`--platform\` et \`--pull\`.
-- Une étape annulée est signalée comme une interruption et non comme un échec, et les conteneurs de service restants sont nettoyés lorsque la préparation de la tâche échoue.
-- Mises à jour de sécurité des bibliothèques Go de réseau et de télémétrie incluses.
+- Les actions officielles \`actions/upload-artifact\` et \`actions/download-artifact\` v4.4.0 et ultérieures fonctionnent désormais : l'exécuteur fournit l'API du service de cache v2 et adapte les actions officielles pour qu'elles l'utilisent, le fork \`gitea-upload-artifact\` n'est donc plus nécessaire.
+- Les \`container.options\` qui atteignent l'hôte de l'exécuteur (par exemple rejoindre son espace de noms de processus) sont maintenant écartées avec un avertissement sauf si \`container.privileged\` est activé. Ce paquet exécute chaque tâche sans privilèges : un workflow reposant sur ces options les verra ignorées.
+- Nouveaux hooks de tâche (\`job_started\`, \`job_completed\`), variables de proxy transmises aux tâches et aux services, et masquage des secrets arrivant encodés dans le journal.
+- Corrections : les réseaux de conteneurs propres à chaque tâche ne sont plus abandonnés, les chemins de conteneur passant par des liens symboliques sont résolus correctement, et plusieurs paniques ont été corrigées.
 
-Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v2.3.0 et https://gitea.com/gitea/runner/releases/tag/v2.2.0`,
+Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
   },
   migrations: {
     // No data migration: the store schema is unchanged across this bump.
