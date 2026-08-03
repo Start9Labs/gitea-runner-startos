@@ -1,6 +1,6 @@
 # gitea-runner binary, pulled from the official multi-arch image (pinned).
 # Bump the tag here and the version in startos/versions/current.ts together.
-FROM gitea/runner:2.3.0 AS runner
+FROM gitea/runner:3.0.0 AS runner
 
 FROM debian:trixie-slim
 
