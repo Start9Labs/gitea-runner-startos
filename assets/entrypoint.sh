@@ -35,27 +35,15 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
-# gitea-runner reads runner labels from config.yaml. Regenerate the config each
-# start and inject the configured labels (replacing the image defaults) so the
-# Configure action's labels take effect.
-gitea-runner generate-config >"$CONFIG"
-if [ -n "$RUNNER_LABELS" ]; then
-  awk -v labels="$RUNNER_LABELS" '
-    /^  labels:[[:space:]]*$/ {
-      print "  labels:"
-      n = split(labels, a, ",")
-      for (i = 1; i <= n; i++) {
-        gsub(/^[ \t]+|[ \t]+$/, "", a[i])
-        if (a[i] != "") print "    - \"" a[i] "\""
-      }
-      skip = 1          # drop gitea-runner default label entries below
-      next
-    }
-    skip && /^[[:space:]]*-/ { next }
-    skip { skip = 0 }
-    { print }
-  ' "$CONFIG" >"$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
-fi
+# gitea-runner reads runner labels from config.yaml. Rewrite the config each
+# start so the Configure action's labels take effect; every key left unset keeps
+# gitea-runner's own default.
+gitea-runner --config "$CONFIG" config init --force
+IFS=',' read -ra RUNNER_LABEL_LIST <<<"$RUNNER_LABELS"
+for label in "${RUNNER_LABEL_LIST[@]}"; do
+  label="$(printf '%s' "$label" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  [ -n "$label" ] && gitea-runner --config "$CONFIG" config add runner.labels "$label"
+done
 
 # Register exactly once; the .runner state file makes this idempotent.
 if [ ! -f "$DATA/.runner" ]; then
