@@ -2,7 +2,7 @@ import { LangDict } from './default'
 
 export default {
   es_ES: {
-    0: 'Este dispositivo no cumple los requisitos mínimos para ejecutar trabajos de CI (2 GiB de RAM y 2 núcleos de CPU).',
+    0: 'Este dispositivo no cumple los requisitos mínimos para ejecutar trabajos de CI (4 GB de RAM y 2 núcleos de CPU).',
     1: 'Almacén no encontrado',
     2: 'Ejecutor',
     3: 'El ejecutor está registrado',
@@ -22,7 +22,7 @@ export default {
     17: 'Gitea aún no es accesible en la red interna. El ejecutor se conectará una vez que su dependencia de Gitea esté en ejecución.',
   },
   de_DE: {
-    0: 'Dieses Gerät erfüllt nicht die Mindestanforderungen zum Ausführen von CI-Aufträgen (2 GiB RAM und 2 CPU-Kerne).',
+    0: 'Dieses Gerät erfüllt nicht die Mindestanforderungen zum Ausführen von CI-Aufträgen (4 GB RAM und 2 CPU-Kerne).',
     1: 'Speicher nicht gefunden',
     2: 'Runner',
     3: 'Runner ist registriert',
@@ -42,7 +42,7 @@ export default {
     17: 'Gitea ist im internen Netzwerk noch nicht erreichbar. Der Runner verbindet sich, sobald seine Gitea-Abhängigkeit läuft.',
   },
   pl_PL: {
-    0: 'To urządzenie nie spełnia minimalnych wymagań do uruchamiania zadań CI (2 GiB RAM i 2 rdzenie CPU).',
+    0: 'To urządzenie nie spełnia minimalnych wymagań do uruchamiania zadań CI (4 GB RAM i 2 rdzenie CPU).',
     1: 'Nie znaleziono magazynu',
     2: 'Runner',
     3: 'Runner jest zarejestrowany',
@@ -62,7 +62,7 @@ export default {
     17: 'Gitea nie jest jeszcze osiągalne w sieci wewnętrznej. Runner połączy się, gdy jego zależność Gitea będzie uruchomiona.',
   },
   fr_FR: {
-    0: 'Cet appareil ne répond pas aux exigences minimales pour exécuter des tâches CI (2 Gio de RAM et 2 cœurs de CPU).',
+    0: 'Cet appareil ne répond pas aux exigences minimales pour exécuter des tâches CI (4 Go de RAM et 2 cœurs de CPU).',
     1: 'Stockage non trouvé',
     2: 'Exécuteur',
     3: "L'exécuteur est enregistré",
