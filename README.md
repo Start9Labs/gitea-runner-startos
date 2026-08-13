@@ -119,7 +119,7 @@ This runner serves only the Gitea on the same device — there is no remote-forg
 
 1. **Local forge only** — registers against the Gitea on this device; there is no remote-instance option.
 2. **No inbound interface** — outbound-only; status and logs are viewed in Gitea, not in a runner UI.
-3. **Labels come from `config.yaml`** — gitea-runner reads runner labels from `config.yaml`, so the package writes the labels you set in **Configure** into the generated config, replacing the image's defaults.
+3. **Labels come from `config.yaml`** — gitea-runner reads runner labels from `config.yaml`, so the entrypoint rewrites that file on every start with the labels you set in **Configure**; every other option keeps gitea-runner's default.
 4. **Emulated foreign-arch jobs are slow** — a native runner per architecture is preferred for regular multi-arch builds.
 
 ## What Is Unchanged from Upstream

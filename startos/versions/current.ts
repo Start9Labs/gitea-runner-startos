@@ -1,48 +1,58 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '3.0.0:0',
+  version: '3.1.0:0',
   releaseNotes: {
-    en_US: `Updated Gitea Runner to 3.0.0.
+    en_US: `Updated Gitea Runner to 3.1.0.
 
-- The stock \`actions/upload-artifact\` and \`actions/download-artifact\` v4.4.0 and newer now work: the runner serves the cache service v2 API and patches the official actions to reach it, so the \`gitea-upload-artifact\` fork is no longer needed.
-- \`container.options\` that reach the runner host (such as joining its process namespace) are now dropped with a warning unless \`container.privileged\` is on. This package runs each job unprivileged, so a workflow relying on those options will see them ignored.
-- New job hooks (\`job_started\`, \`job_completed\`), proxy variables passed through to jobs and services, and masking of secrets that reach the log in an encoded form.
-- Fixes: per-job container networks are no longer leaked, symlinked container paths resolve correctly, and several panics were fixed.
+- Workflows can no longer use the deprecated \`set-env\` and \`add-path\` commands, matching GitHub's runner. Set \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` on the step or job if a workflow still needs them.
+- A job now waits for its service containers to report healthy before it starts, when the service image declares a health check.
+- Error and warning annotations render the file and line they point at.
+- Also carries the 3.0.1 and 3.0.2 fixes: the results service is served from the cache server, completing the cache v2 work behind \`actions/upload-artifact\` and \`actions/download-artifact\`, and a \`format()\` panic that could abort a workflow.
 
-Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
-    es_ES: `Gitea Runner actualizado a 3.0.0.
+Packaging: gitea-runner's example config is now fully commented out, so the runner's config file is written with the new \`config\` commands. The labels set in the Configure action apply as before.
 
-- Las acciones oficiales \`actions/upload-artifact\` y \`actions/download-artifact\` v4.4.0 y posteriores ya funcionan: el ejecutor sirve la API del servicio de caché v2 y ajusta las acciones oficiales para que la utilicen, por lo que ya no hace falta la bifurcación \`gitea-upload-artifact\`.
-- Las opciones de \`container.options\` que alcanzan el anfitrión del ejecutor (por ejemplo, unirse a su espacio de nombres de procesos) ahora se descartan con una advertencia salvo que \`container.privileged\` esté activado. Este paquete ejecuta cada tarea sin privilegios, así que un flujo de trabajo que dependa de esas opciones las verá ignoradas.
-- Nuevos ganchos de tarea (\`job_started\`, \`job_completed\`), variables de proxy propagadas a tareas y servicios, y enmascarado de secretos que llegan al registro en forma codificada.
-- Correcciones: ya no se filtran las redes de contenedor por tarea, las rutas de contenedor con enlaces simbólicos se resuelven correctamente y se corrigieron varios pánicos.
+Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
+    es_ES: `Gitea Runner actualizado a 3.1.0.
 
-Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
-    de_DE: `Gitea Runner auf 3.0.0 aktualisiert.
+- Los flujos de trabajo ya no pueden usar los comandos obsoletos \`set-env\` y \`add-path\`, igual que el ejecutor de GitHub. Define \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` en el paso o en el trabajo si algún flujo aún los necesita.
+- Un trabajo espera ahora a que sus contenedores de servicio informen de buen estado antes de empezar, cuando la imagen del servicio declara una comprobación de salud.
+- Las anotaciones de error y advertencia muestran el archivo y la línea a los que apuntan.
+- Incluye además las correcciones de 3.0.1 y 3.0.2: el servicio de resultados se sirve desde el servidor de caché, completando el trabajo de caché v2 detrás de \`actions/upload-artifact\` y \`actions/download-artifact\`, y un pánico en \`format()\` que podía abortar un flujo de trabajo.
 
-- Die originalen Aktionen \`actions/upload-artifact\` und \`actions/download-artifact\` ab v4.4.0 funktionieren jetzt: Der Runner stellt die Cache-Service-v2-API bereit und passt die offiziellen Aktionen so an, dass sie diese erreichen — der Fork \`gitea-upload-artifact\` wird nicht mehr benötigt.
-- \`container.options\`, die den Runner-Host erreichen (etwa der Beitritt zu dessen Prozess-Namensraum), werden jetzt mit einer Warnung verworfen, sofern \`container.privileged\` nicht aktiviert ist. Dieses Paket führt jeden Auftrag unprivilegiert aus, daher werden solche Optionen in Workflows ignoriert.
-- Neue Job-Hooks (\`job_started\`, \`job_completed\`), Proxy-Variablen werden an Aufträge und Dienste weitergereicht, und codiert im Protokoll auftauchende Geheimnisse werden maskiert.
-- Fehlerbehebungen: Container-Netzwerke einzelner Aufträge bleiben nicht mehr zurück, Pfade mit symbolischen Links im Container werden korrekt aufgelöst, und mehrere Panics wurden behoben.
+Empaquetado: la configuración de ejemplo de gitea-runner viene ahora completamente comentada, así que el archivo de configuración del ejecutor se escribe con los nuevos comandos \`config\`. Las etiquetas definidas en la acción Configurar se aplican igual que antes.
 
-Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
-    pl_PL: `Zaktualizowano Gitea Runner do 3.0.0.
+Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
+    de_DE: `Gitea Runner auf 3.1.0 aktualisiert.
 
-- Oryginalne akcje \`actions/upload-artifact\` i \`actions/download-artifact\` w wersji 4.4.0 i nowszych już działają: runner udostępnia API usługi pamięci podręcznej v2 i dostosowuje oficjalne akcje, aby z niego korzystały, więc fork \`gitea-upload-artifact\` nie jest już potrzebny.
-- Opcje \`container.options\` sięgające hosta runnera (np. dołączenie do jego przestrzeni nazw procesów) są teraz odrzucane z ostrzeżeniem, chyba że włączono \`container.privileged\`. Ten pakiet uruchamia każde zadanie bez uprawnień, więc przepływ pracy zależny od takich opcji zobaczy je zignorowane.
-- Nowe haki zadań (\`job_started\`, \`job_completed\`), zmienne proxy przekazywane do zadań i usług oraz maskowanie sekretów trafiających do dziennika w postaci zakodowanej.
-- Poprawki: sieci kontenerów poszczególnych zadań nie są już porzucane, ścieżki z dowiązaniami symbolicznymi w kontenerze są poprawnie rozwiązywane i naprawiono kilka panik.
+- Workflows können die veralteten Befehle \`set-env\` und \`add-path\` nicht mehr verwenden, wie beim GitHub-Runner. Setze \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` im Schritt oder Job, falls ein Workflow sie weiterhin braucht.
+- Ein Job wartet jetzt darauf, dass seine Service-Container als gesund gemeldet werden, sofern das Service-Image einen Health-Check definiert.
+- Fehler- und Warnungsannotationen zeigen die Datei und Zeile, auf die sie verweisen.
+- Enthält außerdem die Korrekturen aus 3.0.1 und 3.0.2: Der Ergebnisdienst wird vom Cache-Server bereitgestellt und vervollständigt damit die Cache-v2-Arbeit hinter \`actions/upload-artifact\` und \`actions/download-artifact\`, sowie einen Panic in \`format()\`, der einen Workflow abbrechen konnte.
 
-Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
-    fr_FR: `Gitea Runner mis à jour vers 3.0.0.
+Paketierung: Die Beispielkonfiguration von gitea-runner ist jetzt vollständig auskommentiert, daher wird die Konfigurationsdatei des Runners mit den neuen \`config\`-Befehlen geschrieben. Die in der Aktion „Konfigurieren“ gesetzten Labels gelten wie bisher.
 
-- Les actions officielles \`actions/upload-artifact\` et \`actions/download-artifact\` v4.4.0 et ultérieures fonctionnent désormais : l'exécuteur fournit l'API du service de cache v2 et adapte les actions officielles pour qu'elles l'utilisent, le fork \`gitea-upload-artifact\` n'est donc plus nécessaire.
-- Les \`container.options\` qui atteignent l'hôte de l'exécuteur (par exemple rejoindre son espace de noms de processus) sont maintenant écartées avec un avertissement sauf si \`container.privileged\` est activé. Ce paquet exécute chaque tâche sans privilèges : un workflow reposant sur ces options les verra ignorées.
-- Nouveaux hooks de tâche (\`job_started\`, \`job_completed\`), variables de proxy transmises aux tâches et aux services, et masquage des secrets arrivant encodés dans le journal.
-- Corrections : les réseaux de conteneurs propres à chaque tâche ne sont plus abandonnés, les chemins de conteneur passant par des liens symboliques sont résolus correctement, et plusieurs paniques ont été corrigées.
+Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
+    pl_PL: `Zaktualizowano Gitea Runner do 3.1.0.
 
-Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.0.0`,
+- Przepływy pracy nie mogą już używać przestarzałych poleceń \`set-env\` i \`add-path\`, tak jak w runnerze GitHuba. Ustaw \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` w kroku lub zadaniu, jeśli przepływ nadal ich potrzebuje.
+- Zadanie czeka teraz, aż jego kontenery usług zgłoszą poprawny stan, o ile obraz usługi definiuje kontrolę kondycji.
+- Adnotacje błędów i ostrzeżeń pokazują plik i wiersz, na które wskazują.
+- Zawiera także poprawki z 3.0.1 i 3.0.2: usługa wyników jest obsługiwana przez serwer pamięci podręcznej, co domyka prace nad pamięcią podręczną v2 stojące za \`actions/upload-artifact\` i \`actions/download-artifact\`, oraz panikę w \`format()\`, która mogła przerwać przepływ pracy.
+
+Pakowanie: przykładowa konfiguracja gitea-runner jest teraz w całości zakomentowana, więc plik konfiguracyjny runnera powstaje przy użyciu nowych poleceń \`config\`. Etykiety ustawione w akcji Konfiguruj działają tak jak dotąd.
+
+Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
+    fr_FR: `Gitea Runner mis à jour vers 3.1.0.
+
+- Les workflows ne peuvent plus utiliser les commandes obsolètes \`set-env\` et \`add-path\`, comme sur l'exécuteur GitHub. Définissez \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` sur l'étape ou le job si un workflow en a encore besoin.
+- Un job attend désormais que ses conteneurs de service se déclarent sains avant de démarrer, lorsque l'image du service définit une vérification d'état.
+- Les annotations d'erreur et d'avertissement affichent le fichier et la ligne qu'elles désignent.
+- Intègre également les correctifs de 3.0.1 et 3.0.2 : le service de résultats est fourni par le serveur de cache, ce qui achève le travail sur le cache v2 derrière \`actions/upload-artifact\` et \`actions/download-artifact\`, ainsi qu'une panique dans \`format()\` qui pouvait interrompre un workflow.
+
+Empaquetage : la configuration d'exemple de gitea-runner est désormais entièrement commentée, le fichier de configuration de l'exécuteur est donc écrit avec les nouvelles commandes \`config\`. Les libellés définis dans l'action Configurer s'appliquent comme auparavant.
+
+Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
   },
   migrations: {
     // No data migration: the store schema is unchanged across this bump.
