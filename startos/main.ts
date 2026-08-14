@@ -64,6 +64,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
       },
       requires: [],
     })
+    .addOneshot('device-perms', {
+      // StartOS 0.4.0.1 and earlier can hand the service root-only /dev/net/tun
+      // and /dev/fuse; podman opens both as 'app'.
+      subcontainer,
+      exec: {
+        command: ['chmod', '0666', '/dev/net/tun', '/dev/fuse'],
+        user: 'root',
+      },
+      requires: [],
+    })
     .addDaemon('primary', {
       subcontainer,
       exec: {
@@ -75,6 +85,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
           RUNNER_NAME: store.runnerName || 'startos-runner',
           RUNNER_LABELS: store.labels,
           XDG_RUNTIME_DIR: `${DATA_DIR}/runner/run`,
+          // podman looks up its subuid/subgid ranges by $USER, which the
+          // container inherits as 'root' regardless of the user it runs as.
+          USER: 'app',
         },
       },
       ready: {
@@ -94,6 +107,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
                 ),
               },
       },
-      requires: ['own-data'],
+      requires: ['own-data', 'device-perms'],
     })
 })
