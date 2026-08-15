@@ -84,6 +84,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           RUNNER_TOKEN: store.registrationToken,
           RUNNER_NAME: store.runnerName || 'startos-runner',
           RUNNER_LABELS: store.labels,
+          RUNNER_CAPACITY: String(store.capacity),
           XDG_RUNTIME_DIR: `${DATA_DIR}/runner/run`,
           // podman looks up its subuid/subgid ranges by $USER, which the
           // container inherits as 'root' regardless of the user it runs as.

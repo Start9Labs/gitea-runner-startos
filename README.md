@@ -4,11 +4,15 @@
 
 # Gitea Runner on StartOS
 
-> **Upstream docs:** <https://docs.gitea.com/usage/actions>
->
-> Everything not listed in this document behaves identically to upstream gitea-runner. If a feature, setting, or behavior is not mentioned here, the upstream documentation is accurate and fully applicable.
+> Everything not listed in this document should behave the same as upstream
+> Gitea Runner. If a feature, setting, or behavior is not mentioned here, the
+> upstream documentation is accurate and fully applicable — see the
+> Documentation section of `instructions.md` for links.
 
-[gitea-runner](https://gitea.com/gitea/runner) executes Gitea Actions (CI/CD) workflows. This repository packages it for [StartOS](https://github.com/Start9Labs/start-os/), where it runs each job inside a rootless, nested OCI sandbox and serves the Gitea instance installed on the same device.
+[Gitea Runner](https://gitea.com/gitea/runner) executes Gitea Actions workflows. This package runs it against the Gitea on this same device, with a rootless Podman engine inside the service so each job gets its own container.
+
+- **Upstream repo:** <https://gitea.com/gitea/runner>
+- **Wrapper repo:** <https://github.com/Start9Labs/gitea-runner-startos>
 
 ---
 
@@ -16,119 +20,129 @@
 
 - [Image and Container Runtime](#image-and-container-runtime)
 - [Volume and Data Layout](#volume-and-data-layout)
-- [Installation and First-Run Flow](#installation-and-first-run-flow)
-- [Configuration Management](#configuration-management)
-- [Network Access and Interfaces](#network-access-and-interfaces)
-- [Actions (StartOS UI)](#actions-startos-ui)
-- [Job Execution and Multi-Arch](#job-execution-and-multi-arch)
-- [Backups and Restore](#backups-and-restore)
-- [Health Checks](#health-checks)
+- [File Models](#file-models)
 - [Dependencies](#dependencies)
+- [Network Access and Interfaces](#network-access-and-interfaces)
+- [Installation and First-Run Flow](#installation-and-first-run-flow)
+- [Actions](#actions)
+- [Health Checks](#health-checks)
+- [Backups and Restore](#backups-and-restore)
 - [Limitations and Differences](#limitations-and-differences)
-- [What Is Unchanged from Upstream](#what-is-unchanged-from-upstream)
-- [Contributing](#contributing)
 - [Quick Reference for AI Consumers](#quick-reference-for-ai-consumers)
 
 ---
 
 ## Image and Container Runtime
 
-| Aspect        | Standard install                                                 | StartOS                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Image         | The `gitea-runner` binary plus a Docker/Podman socket you supply | Custom image: Debian + rootless **Podman** and **git** (used to fetch `uses:` actions), with the `gitea-runner` binary copied from the official `gitea/runner` image |
-| Architectures | depends on host                                                  | x86_64, aarch64                                                                                                                                                      |
-| Job engine    | an external Docker/Podman daemon you wire up                     | a rootless Podman engine bundled inside the service (`userspaceFilesystems` + `virtualNetworking`)                                                                   |
-| Entrypoint    | `gitea-runner daemon`                                            | a wrapper that starts the Podman socket, writes your configured labels into `config.yaml`, registers once, then runs `gitea-runner daemon`                           |
+The image is built here: upstream's runner binary is copied onto a Debian base carrying a rootless container engine, because the runner needs somewhere to run each job.
 
-Upstream expects you to provide a container engine; this package bundles a rootless Podman engine so each CI job is sandboxed without privileged Docker-in-Docker.
+| Property      | Value                                                                  |
+| ------------- | ---------------------------------------------------------------------- |
+| Image         | Built from `Dockerfile` — upstream's `gitea-runner` binary plus Podman |
+| Architectures | x86_64, aarch64                                                        |
+| Command       | The repo's `entrypoint.sh`, run as the unprivileged `app` user         |
+| Subcontainer  | `gitea-runner-sub` — the `primary` daemon, and the one to `attach` to  |
+
+The manifest declares two device grants that this arrangement requires: **userspace filesystems** for the storage driver, and **virtual networking** for job networking. Without either, the nested engine cannot start a job container. The image also carries `git`, because the runner fetches `uses:` actions with the git CLI and every such step fails without it.
+
+Two oneshots run as root before the daemon. `own-data` creates the runner's working directory on the volume and hands it to `app`, leaving the rest of the volume alone. `device-perms` re-opens `/dev/net/tun` and `/dev/fuse` to mode 0666: StartOS 0.4.0.1 and earlier can create those granted nodes root-only, and the engine opens both as the unprivileged user. It is idempotent and becomes a no-op once the OS-side fix ships.
 
 ## Volume and Data Layout
 
-| Aspect              | StartOS                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Primary volume      | Single managed volume `main`, mounted at `/data`                                                                                            |
-| Runner working area | `/data/runner` — the generated `config.yaml`, the `.runner` registration state, and the Podman layer store (so job images survive restarts) |
-| StartOS settings    | `/data/store.json` — registration token, runner name, labels, and concurrency (see [Configuration Management](#configuration-management))   |
+One volume, shared between the package's state and the runner's working area.
 
-## Installation and First-Run Flow
+| Volume | Mount Point | Purpose                                                                                                  |
+| ------ | ----------- | -------------------------------------------------------------------------------------------------------- |
+| `main` | `/data`     | `store.json`, and the runner's working directory under `runner/` — including its registration state file |
 
-The runner does nothing until it is connected to a Gitea instance.
+## File Models
 
-1. On start, the entrypoint brings up the rootless Podman socket and generates a default `config.yaml`.
-2. If no registration token is configured, the service stays up but idle and prompts you to run **Configure**.
-3. Once configured, it registers once (idempotent via the `.runner` state file) and runs the runner daemon, which long-polls Gitea for jobs.
+Two models. One is what you supply; the other is the runner's own registration state, which the package only ever reads.
 
-## Configuration Management
+| File             | Format | Modelled                | Written by                           |
+| ---------------- | ------ | ----------------------- | ------------------------------------ |
+| `store.json`     | JSON   | Yes — `FileHelper.json` | Every init, and the Configure action |
+| `runner/.runner` | JSON   | Read-only               | The runner itself, when it registers |
 
-Upstream `gitea-runner` is configured through `config.yaml` and `register` flags. On StartOS you set the connection through the **Configure** action; values persist in `store.json` and are applied on each start.
+| Key                 | Notes                                                                            |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `registrationToken` | A **single-use** token from Gitea's Create-new-Runner screen                     |
+| `runnerName`        | How the runner identifies itself in Gitea; defaults to `startos-runner`          |
+| `labels`            | Comma-separated, in the runner's own `name:docker://image` or `name:host` syntax |
+| `capacity`          | How many jobs run at once                                                        |
 
-| Setting            | Managed via                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| Registration token | "Configure" action                                                                    |
-| Runner name        | "Configure" action                                                                    |
-| Labels             | "Configure" action — written into `config.yaml`, where gitea-runner reads them        |
-| Concurrent jobs    | "Configure" action                                                                    |
-| Forge URL          | Always the local Gitea, resolved from its HTTP interface over the internal LXC bridge |
+`store.json` strips keys it does not declare, and nothing else writes it. Everything else reaches the runner as environment on each start, including the connection to Gitea — whose address is resolved rather than stored.
 
-## Network Access and Interfaces
+`USER` is set to the unprivileged account the daemon runs as, not left at the container's inherited `root`. The container engine resolves its subordinate UID and GID ranges by `$USER`, and finding none for `root` it falls back to a single-ID mapping — under which any job image carrying a file not owned by root fails to unpack.
 
-**None.** The runner makes only outbound connections — it long-polls Gitea for jobs and pulls job images — and exposes no inbound interface. View its status and job logs inside Gitea (its Runners list and the Actions tab), plus the StartOS service logs.
-
-## Actions (StartOS UI)
-
-| Action    | Visibility | Availability | Purpose                                                          |
-| --------- | ---------- | ------------ | ---------------------------------------------------------------- |
-| Configure | Visible    | Any          | Set the registration token, runner name, labels, and concurrency |
-
-### Configure
-
-- **Inputs:** Registration token (required), runner name, labels, concurrent jobs
-- **Outputs:** None — restart the service to apply
-- Each run drops the existing registration so the next start re-registers with the new settings. Registration tokens are single-use, so provide a fresh one each time.
-
-## Job Execution and Multi-Arch
-
-Each job runs in its own container via the bundled rootless Podman engine. StartOS registers QEMU `binfmt` handlers host-wide, so a job targeting a foreign architecture (`arm64`, `riscv64`, …) runs under emulation automatically — no per-container setup. Emulated builds are much slower than native; for regular multi-arch work, prefer a native runner per architecture and reserve emulation for architectures you have no native hardware for.
-
-The runner image ships `git`, which the daemon shells out to when fetching `uses:` actions (such as `actions/checkout`); without it every `uses:` step would fail at the action fetch. The first job for a given image tag also pulls that image (~1 GB for the default `ubuntu-latest`), so its initial **Set up job** step can take a minute or two before the image is cached locally.
-
-## Backups and Restore
-
-| Aspect  | StartOS                                                                                                      |
-| ------- | ------------------------------------------------------------------------------------------------------------ |
-| Scope   | Full `/data` volume — `store.json`, the runner config, registration state, and cached job images             |
-| Restore | The volume is fully restored before the service starts; the runner reconnects with its existing registration |
-
-## Health Checks
-
-| Aspect       | StartOS                                                                                                              |
-| ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Method       | Reflects registration state, displayed as "Runner"                                                                   |
-| Grace period | 60 seconds                                                                                                           |
-| Behavior     | Healthy once the runner has registered (its `.runner` state file exists); otherwise prompts you to run **Configure** |
+**`runner/.runner` is the ground truth for whether this runner is registered**, and it is why the health check does not simply look at whether a token is stored. A runner registered out of band, or restored from a backup whose stored token was cleared, is fully working while carrying no token here; the state file reflects that and the token does not.
 
 ## Dependencies
 
-| Dependency | Required?          | Purpose                                                                                                                                         |
-| ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gitea**  | Required (running) | The forge this runner serves. The runner registers and long-polls over Gitea's HTTP API, so Gitea's web-interface health check must be passing. |
+One, and it is required in the strong sense.
 
-This runner serves only the Gitea on the same device — there is no remote-forge mode.
+| Dependency | Kind      | Health check | Mounts | Why                                            |
+| ---------- | --------- | ------------ | ------ | ---------------------------------------------- |
+| Gitea      | `running` | `primary`    | none   | The forge this runner registers with and polls |
+
+The health check is required as well as "running", because the runner talks to Gitea's HTTP API — a Gitea that is up but not yet serving is no use to it.
+
+**This runner only ever serves the Gitea on this device.** The address is resolved from Gitea's own binding over the service bridge; there is no field for a remote forge. If Gitea is not reachable, `main` refuses to start with a message saying so rather than starting a runner that cannot register.
+
+## Network Access and Interfaces
+
+None. The runner dials out to its forge and pulls job images; it accepts no inbound connections and exports nothing.
+
+## Installation and First-Run Flow
+
+Install seeds the store with defaults and nothing else. There is no task, and the service starts — but it will not do any work until you register it.
+
+Two gates apply before that, both enforced rather than advisory:
+
+1. **Hardware.** `main` refuses to start on a device below 2 CPU cores or roughly a 4 GB machine's worth of memory, because every job is a full build. The message says so explicitly rather than failing obscurely later.
+2. **Gitea.** It must be installed and serving.
+
+Then run [Configure](#actions) with a registration token from Gitea's **Settings → Actions → Runners → Create new Runner**, and restart. Registration happens on that restart, at which point the runner writes its state file and the health check turns green.
+
+## Actions
+
+One action.
+
+### Configure
+
+Registers the runner with Gitea and sets how it advertises itself.
+
+- **What it changes:** every field in `store.json` — the registration token, name, labels, and concurrency.
+- **Cost:** the write is instant, but **registration happens on the next restart**, not on save.
+- **Repeat safety:** re-running is safe, but **a registration token is single-use.** Saving re-registers on the next restart, so a second run needs a _fresh_ token from Gitea; reusing the old one fails to register.
+- **Input notes:** labels use the runner's own syntax. A foreign-architecture label here also serves emulated jobs, which run far slower than native ones — a second runner on the other architecture is the better arrangement for regular builds.
+
+## Health Checks
+
+One check, and it reports registration rather than liveness.
+
+| Check              | Method                                              | Grace Period |
+| ------------------ | --------------------------------------------------- | ------------ |
+| `primary` "Runner" | Whether the runner's registration state file exists | 60 seconds   |
+
+It polls slowly, because the thing it reports changes only at registration. A failure means the runner has not registered — it names the action to run. A pass means it has; whether Gitea is currently handing it jobs is visible in Gitea, not here.
+
+## Backups and Restore
+
+The `main` volume is copied wholesale — `sdk.Backups.ofVolumes('main')`. No dump step and nothing excluded.
+
+- **Included:** the store, and the runner's working directory with its registration state file.
+- **Restore:** the runner comes back registered, because the state file travels with the backup. Whether Gitea still recognises that registration depends on Gitea's own state, which is that package's backup rather than this one's — if the forge was rebuilt, register again with a fresh token.
 
 ## Limitations and Differences
 
-1. **Local forge only** — registers against the Gitea on this device; there is no remote-instance option.
-2. **No inbound interface** — outbound-only; status and logs are viewed in Gitea, not in a runner UI.
-3. **Labels come from `config.yaml`** — gitea-runner reads runner labels from `config.yaml`, so the entrypoint rewrites that file on every start with the labels you set in **Configure**; every other option keeps gitea-runner's default.
-4. **Emulated foreign-arch jobs are slow** — a native runner per architecture is preferred for regular multi-arch builds.
-
-## What Is Unchanged from Upstream
-
-Everything not listed above behaves as documented at <https://docs.gitea.com/usage/actions/overview> — workflow syntax, the `register`/`daemon` behavior, label matching, and job execution semantics.
-
-## Contributing
-
-Build and development workflow follow the StartOS packaging guide: <https://docs.start9.com/packaging>. Keep `README.md`, `instructions.md`, and `AGENTS.md` in sync with any change to user-visible behavior or package structure.
+1. **Only the Gitea on this device.** There is no field for a remote forge; the address is resolved from the local dependency.
+2. **Registration tokens are single-use.** Re-running Configure needs a new one from Gitea.
+3. **Configuration applies on restart**, not immediately.
+4. **The service refuses to start on small hardware** — under 2 cores or roughly a 4 GB machine.
+5. **Emulated jobs are much slower than native**, and are opted into by adding a foreign-architecture label by hand.
+6. **Jobs run in a rootless engine inside the service**, which requires the two device grants named above, and on StartOS 0.4.0.1 and earlier a startup step to make those device nodes readable by the unprivileged user.
+7. **No riscv64 build.** x86_64 and aarch64 only.
 
 ---
 
@@ -136,20 +150,31 @@ Build and development workflow follow the StartOS packaging guide: <https://docs
 
 ```yaml
 package_id: gitea-runner
-image: custom (Debian + rootless Podman + git + gitea-runner)
-architectures: [x86_64, aarch64]
+image: ./Dockerfile # upstream's runner binary plus rootless Podman on Debian
+architectures:
+  - x86_64
+  - aarch64
+subcontainers:
+  - gitea-runner-sub
 volumes:
   main: /data
-ports: none
-dependencies:
-  - gitea (required, running)
+file_models:
+  - store.json
+  - runner/.runner # read-only; the runner's own registration state
 startos_managed_env_vars:
   - INSTANCE_URL
   - RUNNER_TOKEN
   - RUNNER_NAME
   - RUNNER_LABELS
+  - RUNNER_CAPACITY
   - XDG_RUNTIME_DIR
   - USER
+dependencies:
+  - gitea # required; gated on its primary health check
+interfaces: {} # none; the runner accepts no inbound connections
 actions:
   - configure
+tasks: []
+health_checks:
+  - primary # displayed "Runner"; reports whether the runner has registered
 ```

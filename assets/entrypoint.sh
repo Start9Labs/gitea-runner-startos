@@ -7,6 +7,7 @@ set -euo pipefail
 : "${RUNNER_TOKEN:=}"
 : "${RUNNER_NAME:=startos-runner}"
 : "${RUNNER_LABELS:=}"
+: "${RUNNER_CAPACITY:=1}"
 
 # App-owned working area (chowned by the own-data oneshot); StartOS's own
 # store.json stays at /data and is left untouched.
@@ -39,6 +40,9 @@ done
 # start so the Configure action's labels take effect; every key left unset keeps
 # gitea-runner's own default.
 gitea-runner --config "$CONFIG" config init --force
+# `config init` writes a minimal file with no capacity key, so this must be a
+# `config set` — a sed over the generated config has nothing to match.
+gitea-runner --config "$CONFIG" config set runner.capacity "$RUNNER_CAPACITY"
 IFS=',' read -ra RUNNER_LABEL_LIST <<<"$RUNNER_LABELS"
 for label in "${RUNNER_LABEL_LIST[@]}"; do
   label="$(printf '%s' "$label" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
