@@ -25,6 +25,7 @@
 - [Network Access and Interfaces](#network-access-and-interfaces)
 - [Installation and First-Run Flow](#installation-and-first-run-flow)
 - [Actions](#actions)
+- [Tasks](#tasks)
 - [Health Checks](#health-checks)
 - [Backups and Restore](#backups-and-restore)
 - [Limitations and Differences](#limitations-and-differences)
@@ -116,6 +117,10 @@ Registers the runner with Gitea and sets how it advertises itself.
 - **Cost:** the write is instant, but **registration happens on the next restart**, not on save.
 - **Repeat safety:** re-running is safe, but **a registration token is single-use.** Saving re-registers on the next restart, so a second run needs a _fresh_ token from Gitea; reusing the old one fails to register.
 - **Input notes:** labels use the runner's own syntax. A foreign-architecture label here also serves emulated jobs, which run far slower than native ones — a second runner on the other architecture is the better arrangement for regular builds.
+
+## Tasks
+
+None. This package raises no tasks, so the service is never held on a prompt and its ordinary controls are always available.
 
 ## Health Checks
 
