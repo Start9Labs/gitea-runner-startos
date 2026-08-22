@@ -1,58 +1,53 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '3.1.0:1',
+  version: '3.3.0:0',
   releaseNotes: {
-    en_US: `Updated Gitea Runner to 3.1.0.
+    en_US: `Updated Gitea Runner to 3.3.0, which also carries the 3.2.0 release.
 
-- Workflows can no longer use the deprecated \`set-env\` and \`add-path\` commands, matching GitHub's runner. Set \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` on the step or job if a workflow still needs them.
-- A job now waits for its service containers to report healthy before it starts, when the service image declares a health check.
-- Error and warning annotations render the file and line they point at.
-- Also carries the 3.0.1 and 3.0.2 fixes: the results service is served from the cache server, completing the cache v2 work behind \`actions/upload-artifact\` and \`actions/download-artifact\`, and a \`format()\` panic that could abort a workflow.
+- **Behavior change:** the tool cache is no longer shared between jobs. Each job now uses what its image ships and discards what it installs, the same as GitHub Actions. The shared volume was not safe for two jobs to write at once, so it could be corrupted whenever Concurrent Jobs was above 1.
+- A failed step no longer breaks artifact uploads for the rest of the job: every later \`actions/upload-artifact\` used to fail with \`GHESNotSupportedError\`.
+- Calls to Gitea now time out instead of hanging, so a job no longer goes quiet until Gitea gives up on it.
+- Cache entries can be evicted by size, and cache retention counts from last use rather than from creation.
+- Workflows can refer to their own repository with GitHub's \`$/\` prefix in \`uses:\`, and \`workflow_dispatch\` inputs appear in the job's "Set up job" section.
 
-Packaging: gitea-runner's example config is now fully commented out, so the runner's config file is written with the new \`config\` commands. The labels set in the Configure action apply as before. This release also fixes two problems with the bundled Podman engine: jobs failing before their first step because it could not open the tunnel device that gives each job container a network, and job images containing files not owned by root — most Ubuntu-based images — failing to unpack. The Concurrent Jobs setting in the Configure action now takes effect; it was being saved but never applied, so the runner always ran one job at a time.
+Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.3.0 and https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
+    es_ES: `Gitea Runner actualizado a 3.3.0, que incluye también la versión 3.2.0.
 
-Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
-    es_ES: `Gitea Runner actualizado a 3.1.0.
+- **Cambio de comportamiento:** la caché de herramientas ya no se comparte entre trabajos. Cada trabajo usa ahora lo que trae su imagen y descarta lo que instala, igual que en GitHub Actions. El volumen compartido no era seguro para que dos trabajos escribieran a la vez, así que podía corromperse siempre que Trabajos simultáneos fuera mayor que 1.
+- Un paso fallido ya no rompe las subidas de artefactos durante el resto del trabajo: antes, cada \`actions/upload-artifact\` posterior fallaba con \`GHESNotSupportedError\`.
+- Las llamadas a Gitea ahora expiran en lugar de quedarse colgadas, así que un trabajo ya no se queda en silencio hasta que Gitea lo da por perdido.
+- Las entradas de la caché pueden expulsarse por tamaño, y la retención de la caché se cuenta desde el último uso en lugar de desde la creación.
+- Los flujos de trabajo pueden referirse a su propio repositorio con el prefijo \`$/\` de GitHub en \`uses:\`, y las entradas de \`workflow_dispatch\` aparecen en la sección «Set up job» del trabajo.
 
-- Los flujos de trabajo ya no pueden usar los comandos obsoletos \`set-env\` y \`add-path\`, igual que el ejecutor de GitHub. Define \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` en el paso o en el trabajo si algún flujo aún los necesita.
-- Un trabajo espera ahora a que sus contenedores de servicio informen de buen estado antes de empezar, cuando la imagen del servicio declara una comprobación de salud.
-- Las anotaciones de error y advertencia muestran el archivo y la línea a los que apuntan.
-- Incluye además las correcciones de 3.0.1 y 3.0.2: el servicio de resultados se sirve desde el servidor de caché, completando el trabajo de caché v2 detrás de \`actions/upload-artifact\` y \`actions/download-artifact\`, y un pánico en \`format()\` que podía abortar un flujo de trabajo.
+Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.3.0 y https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
+    de_DE: `Gitea Runner auf 3.3.0 aktualisiert, womit auch die Version 3.2.0 enthalten ist.
 
-Empaquetado: la configuración de ejemplo de gitea-runner viene ahora completamente comentada, así que el archivo de configuración del ejecutor se escribe con los nuevos comandos \`config\`. Las etiquetas definidas en la acción Configurar se aplican igual que antes. Este lanzamiento corrige además dos problemas del motor Podman incluido: los trabajos fallaban antes de su primer paso porque no podía abrir el dispositivo de túnel que da red a cada contenedor de trabajo, y las imágenes de trabajo con archivos que no pertenecen a root —la mayoría de las basadas en Ubuntu— no se descomprimían. El ajuste Trabajos simultáneos de la acción Configurar ya surte efecto: se guardaba pero nunca se aplicaba, así que el ejecutor siempre ejecutaba un trabajo a la vez.
+- **Verhaltensänderung:** Der Tool-Cache wird nicht mehr zwischen Jobs geteilt. Jeder Job verwendet jetzt das, was sein Image mitbringt, und verwirft, was er installiert — genau wie bei GitHub Actions. Das gemeinsame Volume war nicht sicher, wenn zwei Jobs gleichzeitig hineinschrieben, es konnte also beschädigt werden, sobald „Gleichzeitige Aufträge“ über 1 lag.
+- Ein fehlgeschlagener Schritt bricht die Artefakt-Uploads im restlichen Job nicht mehr ab: Bisher schlug jedes spätere \`actions/upload-artifact\` mit \`GHESNotSupportedError\` fehl.
+- Aufrufe an Gitea laufen jetzt in einen Timeout, statt hängen zu bleiben, sodass ein Job nicht mehr verstummt, bis Gitea ihn aufgibt.
+- Cache-Einträge können nach Größe verdrängt werden, und die Cache-Aufbewahrung zählt ab der letzten Nutzung statt ab der Erstellung.
+- Workflows können ihr eigenes Repository mit GitHubs \`$/\`-Präfix in \`uses:\` ansprechen, und \`workflow_dispatch\`-Eingaben erscheinen im Abschnitt „Set up job“ des Jobs.
 
-Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
-    de_DE: `Gitea Runner auf 3.1.0 aktualisiert.
+Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.3.0 und https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
+    pl_PL: `Zaktualizowano Gitea Runner do 3.3.0, co obejmuje także wydanie 3.2.0.
 
-- Workflows können die veralteten Befehle \`set-env\` und \`add-path\` nicht mehr verwenden, wie beim GitHub-Runner. Setze \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` im Schritt oder Job, falls ein Workflow sie weiterhin braucht.
-- Ein Job wartet jetzt darauf, dass seine Service-Container als gesund gemeldet werden, sofern das Service-Image einen Health-Check definiert.
-- Fehler- und Warnungsannotationen zeigen die Datei und Zeile, auf die sie verweisen.
-- Enthält außerdem die Korrekturen aus 3.0.1 und 3.0.2: Der Ergebnisdienst wird vom Cache-Server bereitgestellt und vervollständigt damit die Cache-v2-Arbeit hinter \`actions/upload-artifact\` und \`actions/download-artifact\`, sowie einen Panic in \`format()\`, der einen Workflow abbrechen konnte.
+- **Zmiana zachowania:** pamięć podręczna narzędzi nie jest już współdzielona między zadaniami. Każde zadanie korzysta teraz z tego, co zawiera jego obraz, i odrzuca to, co zainstaluje — tak samo jak w GitHub Actions. Wspólny wolumin nie był bezpieczny przy jednoczesnym zapisie z dwóch zadań, więc mógł ulec uszkodzeniu, gdy „Zadania równoległe” ustawiono powyżej 1.
+- Nieudany krok nie psuje już przesyłania artefaktów w dalszej części zadania: dotąd każde kolejne \`actions/upload-artifact\` kończyło się błędem \`GHESNotSupportedError\`.
+- Wywołania do Gitei mają teraz limit czasu zamiast zawieszać się, więc zadanie nie milknie aż do chwili, gdy Gitea je porzuci.
+- Wpisy pamięci podręcznej mogą być usuwane według rozmiaru, a czas przechowywania liczy się od ostatniego użycia zamiast od utworzenia.
+- Przepływy pracy mogą wskazywać własne repozytorium przedrostkiem \`$/\` z GitHuba w \`uses:\`, a dane wejściowe \`workflow_dispatch\` pojawiają się w sekcji „Set up job” zadania.
 
-Paketierung: Die Beispielkonfiguration von gitea-runner ist jetzt vollständig auskommentiert, daher wird die Konfigurationsdatei des Runners mit den neuen \`config\`-Befehlen geschrieben. Die in der Aktion „Konfigurieren“ gesetzten Labels gelten wie bisher. Diese Version behebt außerdem zwei Probleme der mitgelieferten Podman-Engine: Jobs scheiterten vor ihrem ersten Schritt, weil sie das Tunnelgerät nicht öffnen konnte, das jedem Job-Container ein Netzwerk gibt, und Job-Images mit Dateien, die nicht root gehören — die meisten Ubuntu-basierten Images — ließen sich nicht entpacken. Die Einstellung „Gleichzeitige Jobs“ in der Aktion „Konfigurieren“ wirkt jetzt: Sie wurde gespeichert, aber nie angewendet, sodass der Runner immer nur einen Job gleichzeitig ausführte.
+Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.3.0 oraz https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
+    fr_FR: `Gitea Runner mis à jour vers 3.3.0, ce qui inclut également la version 3.2.0.
 
-Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
-    pl_PL: `Zaktualizowano Gitea Runner do 3.1.0.
+- **Changement de comportement :** le cache d'outils n'est plus partagé entre les jobs. Chaque job utilise désormais ce que son image fournit et jette ce qu'il installe, comme sur GitHub Actions. Le volume partagé n'était pas sûr lorsque deux jobs y écrivaient en même temps, il pouvait donc être corrompu dès que « Tâches simultanées » dépassait 1.
+- Une étape en échec ne casse plus les envois d'artefacts pour le reste du job : jusqu'ici, chaque \`actions/upload-artifact\` suivant échouait avec \`GHESNotSupportedError\`.
+- Les appels vers Gitea expirent maintenant au lieu de rester bloqués, si bien qu'un job ne reste plus muet jusqu'à ce que Gitea l'abandonne.
+- Les entrées du cache peuvent être évincées selon leur taille, et la rétention du cache se compte à partir de la dernière utilisation plutôt que de la création.
+- Les workflows peuvent désigner leur propre dépôt avec le préfixe \`$/\` de GitHub dans \`uses:\`, et les entrées de \`workflow_dispatch\` apparaissent dans la section « Set up job » du job.
 
-- Przepływy pracy nie mogą już używać przestarzałych poleceń \`set-env\` i \`add-path\`, tak jak w runnerze GitHuba. Ustaw \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` w kroku lub zadaniu, jeśli przepływ nadal ich potrzebuje.
-- Zadanie czeka teraz, aż jego kontenery usług zgłoszą poprawny stan, o ile obraz usługi definiuje kontrolę kondycji.
-- Adnotacje błędów i ostrzeżeń pokazują plik i wiersz, na które wskazują.
-- Zawiera także poprawki z 3.0.1 i 3.0.2: usługa wyników jest obsługiwana przez serwer pamięci podręcznej, co domyka prace nad pamięcią podręczną v2 stojące za \`actions/upload-artifact\` i \`actions/download-artifact\`, oraz panikę w \`format()\`, która mogła przerwać przepływ pracy.
-
-Pakowanie: przykładowa konfiguracja gitea-runner jest teraz w całości zakomentowana, więc plik konfiguracyjny runnera powstaje przy użyciu nowych poleceń \`config\`. Etykiety ustawione w akcji Konfiguruj działają tak jak dotąd. To wydanie naprawia też dwa problemy wbudowanego silnika Podman: zadania kończyły się niepowodzeniem przed pierwszym krokiem, bo nie mógł on otworzyć urządzenia tunelowego dającego sieć każdemu kontenerowi zadania, a obrazy zadań zawierające pliki nienależące do roota — czyli większość opartych na Ubuntu — nie dawały się rozpakować. Ustawienie „Równoczesne zadania” w akcji Konfiguruj wreszcie działa: było zapisywane, ale nigdy stosowane, więc runner zawsze wykonywał jedno zadanie naraz.
-
-Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
-    fr_FR: `Gitea Runner mis à jour vers 3.1.0.
-
-- Les workflows ne peuvent plus utiliser les commandes obsolètes \`set-env\` et \`add-path\`, comme sur l'exécuteur GitHub. Définissez \`ACTIONS_ALLOW_UNSECURE_COMMANDS\` sur l'étape ou le job si un workflow en a encore besoin.
-- Un job attend désormais que ses conteneurs de service se déclarent sains avant de démarrer, lorsque l'image du service définit une vérification d'état.
-- Les annotations d'erreur et d'avertissement affichent le fichier et la ligne qu'elles désignent.
-- Intègre également les correctifs de 3.0.1 et 3.0.2 : le service de résultats est fourni par le serveur de cache, ce qui achève le travail sur le cache v2 derrière \`actions/upload-artifact\` et \`actions/download-artifact\`, ainsi qu'une panique dans \`format()\` qui pouvait interrompre un workflow.
-
-Empaquetage : la configuration d'exemple de gitea-runner est désormais entièrement commentée, le fichier de configuration de l'exécuteur est donc écrit avec les nouvelles commandes \`config\`. Les libellés définis dans l'action Configurer s'appliquent comme auparavant. Cette version corrige aussi deux problèmes du moteur Podman intégré : les jobs échouaient avant leur première étape car il ne parvenait pas à ouvrir le périphérique tunnel qui donne un réseau à chaque conteneur de job, et les images de job contenant des fichiers n'appartenant pas à root — la plupart des images basées sur Ubuntu — ne se décompressaient pas. Le réglage « Jobs simultanés » de l'action Configurer prend désormais effet : il était enregistré mais jamais appliqué, si bien que l'exécuteur ne traitait jamais qu'un job à la fois.
-
-Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.1.0`,
+Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.3.0 et https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
   },
   migrations: {
     // No data migration: the store schema is unchanged across this bump.
