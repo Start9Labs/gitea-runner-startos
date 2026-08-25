@@ -1,7 +1,7 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '3.3.0:0',
+  version: '3.3.0:1',
   releaseNotes: {
     en_US: `Updated Gitea Runner to 3.3.0, which also carries the 3.2.0 release.
 
@@ -10,6 +10,8 @@ export const current = VersionInfo.of({
 - Calls to Gitea now time out instead of hanging, so a job no longer goes quiet until Gitea gives up on it.
 - Cache entries can be evicted by size, and cache retention counts from last use rather than from creation.
 - Workflows can refer to their own repository with GitHub's \`$/\` prefix in \`uses:\`, and \`workflow_dispatch\` inputs appear in the job's "Set up job" section.
+
+Packaging: rebooting the server no longer leaves the runner restarting in a loop and never picking up jobs.
 
 Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.3.0 and https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
     es_ES: `Gitea Runner actualizado a 3.3.0, que incluye también la versión 3.2.0.
@@ -20,6 +22,8 @@ Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.3.0 
 - Las entradas de la caché pueden expulsarse por tamaño, y la retención de la caché se cuenta desde el último uso en lugar de desde la creación.
 - Los flujos de trabajo pueden referirse a su propio repositorio con el prefijo \`$/\` de GitHub en \`uses:\`, y las entradas de \`workflow_dispatch\` aparecen en la sección «Set up job» del trabajo.
 
+Empaquetado: reiniciar el servidor ya no deja al runner reiniciándose en bucle sin recoger ningún trabajo.
+
 Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.3.0 y https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
     de_DE: `Gitea Runner auf 3.3.0 aktualisiert, womit auch die Version 3.2.0 enthalten ist.
 
@@ -28,6 +32,8 @@ Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.3
 - Aufrufe an Gitea laufen jetzt in einen Timeout, statt hängen zu bleiben, sodass ein Job nicht mehr verstummt, bis Gitea ihn aufgibt.
 - Cache-Einträge können nach Größe verdrängt werden, und die Cache-Aufbewahrung zählt ab der letzten Nutzung statt ab der Erstellung.
 - Workflows können ihr eigenes Repository mit GitHubs \`$/\`-Präfix in \`uses:\` ansprechen, und \`workflow_dispatch\`-Eingaben erscheinen im Abschnitt „Set up job“ des Jobs.
+
+Paketierung: Ein Neustart des Servers lässt den Runner nicht mehr in einer Endlosschleife hängen, in der er keine Jobs annimmt.
 
 Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.3.0 und https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
     pl_PL: `Zaktualizowano Gitea Runner do 3.3.0, co obejmuje także wydanie 3.2.0.
@@ -38,6 +44,8 @@ Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.3
 - Wpisy pamięci podręcznej mogą być usuwane według rozmiaru, a czas przechowywania liczy się od ostatniego użycia zamiast od utworzenia.
 - Przepływy pracy mogą wskazywać własne repozytorium przedrostkiem \`$/\` z GitHuba w \`uses:\`, a dane wejściowe \`workflow_dispatch\` pojawiają się w sekcji „Set up job” zadania.
 
+Pakowanie: ponowne uruchomienie serwera nie zostawia już runnera w pętli restartów bez pobierania zadań.
+
 Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.3.0 oraz https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
     fr_FR: `Gitea Runner mis à jour vers 3.3.0, ce qui inclut également la version 3.2.0.
 
@@ -46,6 +54,8 @@ Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.3.0 
 - Les appels vers Gitea expirent maintenant au lieu de rester bloqués, si bien qu'un job ne reste plus muet jusqu'à ce que Gitea l'abandonne.
 - Les entrées du cache peuvent être évincées selon leur taille, et la rétention du cache se compte à partir de la dernière utilisation plutôt que de la création.
 - Les workflows peuvent désigner leur propre dépôt avec le préfixe \`$/\` de GitHub dans \`uses:\`, et les entrées de \`workflow_dispatch\` apparaissent dans la section « Set up job » du job.
+
+Empaquetage : redémarrer le serveur ne laisse plus le runner redémarrer en boucle sans jamais prendre de jobs.
 
 Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.3.0 et https://gitea.com/gitea/runner/releases/tag/v3.2.0`,
   },
