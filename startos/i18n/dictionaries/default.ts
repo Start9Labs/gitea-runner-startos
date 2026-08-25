@@ -4,7 +4,7 @@ const dict = {
   'This device does not meet the minimum requirements to run CI jobs (4 GB of RAM and 2 CPU cores).': 0,
   'Store not found': 1,
   Runner: 2,
-  'Runner is registered': 3,
+  'Runner is running': 3,
   'Run the Configure action to connect this runner to a Gitea instance': 4,
   'Registration Token': 5,
   'A runner registration token from the Gitea instance, under Site/Org/Repo Settings → Actions → Runners → Create new Runner.': 6,
@@ -19,6 +19,7 @@ const dict = {
   Saved: 15,
   'Runner configuration saved. Restart the service to (re)register with these settings.': 16,
   'Gitea is not yet reachable on the internal network. The runner will connect once its Gitea dependency is running.': 17,
+  'The runner is not running': 18,
 }
 
 export type I18nKey = keyof typeof dict
