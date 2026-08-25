@@ -20,7 +20,7 @@ This runner serves the Gitea on the same device, so install and start **Gitea** 
 
 ## Using the Gitea Runner
 
-Once it is online, Gitea dispatches workflow jobs to it automatically — there is nothing to drive here day to day. Follow progress and read job logs in Gitea's **Actions** tab; the service logs here show registration and startup.
+Once it is online, Gitea dispatches workflow jobs to it automatically — there is nothing to drive here day to day. Follow progress and read job logs in Gitea's **Actions** tab; here, the **Runner** health check shows whether it is up, and the service logs show registration and startup.
 
 ### Labels and architecture
 

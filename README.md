@@ -124,13 +124,13 @@ None. This package raises no tasks, so the service is never held on a prompt and
 
 ## Health Checks
 
-One check, and it reports registration rather than liveness.
+One check, on the `primary` daemon.
 
-| Check              | Method                                              | Grace Period |
-| ------------------ | --------------------------------------------------- | ------------ |
-| `primary` "Runner" | Whether the runner's registration state file exists | 60 seconds   |
+| Check              | Method                                                                                      | Grace Period |
+| ------------------ | ------------------------------------------------------------------------------------------- | ------------ |
+| `primary` "Runner" | Registration state file present, then the runner process alive and the Podman API answering | 60 seconds   |
 
-It polls slowly, because the thing it reports changes only at registration. A failure means the runner has not registered — it names the action to run. A pass means it has; whether Gitea is currently handing it jobs is visible in Gitea, not here.
+Before registration it fails and names the action to run. After it, the check runs a script in the service container every 30 seconds: a `gitea-runner` process must appear in `/proc`, and `podman --remote info` must succeed against the API socket the runner drives. Both have to hold — the runner exits when the engine is unreachable, and an engine with no runner behind it serves nothing. Whether Gitea is currently handing it jobs is visible in Gitea, not here.
 
 ## Backups and Restore
 
@@ -181,5 +181,5 @@ actions:
   - configure
 tasks: []
 health_checks:
-  - primary # displayed "Runner"; reports whether the runner has registered
+  - primary # displayed "Runner"; registration, then runner + engine liveness
 ```

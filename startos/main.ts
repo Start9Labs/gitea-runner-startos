@@ -104,13 +104,25 @@ export const main = sdk.setupMain(async ({ effects }) => {
       ready: {
         display: i18n('Runner'),
         gracePeriod: 60000,
-        // Key health off the registration state file, not the store token: a
-        // runner registered out-of-band has a live `.runner` but no token here.
-        // Poll slowly — registration state is steady, not flapping.
+        // Key the registered/not test off the state file, not the store token:
+        // a runner registered out-of-band has a live `.runner` but no token here.
         trigger: sdk.trigger.cooldownTrigger(30000),
         fn: async () =>
           (await runnerState.read().const(effects))
-            ? { result: 'success', message: i18n('Runner is registered') }
+            ? sdk.healthCheck.runHealthScript(
+                [
+                  'bash',
+                  '-c',
+                  // `comm` is 15 characters wide, which `gitea-runner` fits.
+                  `grep -qx gitea-runner /proc/[0-9]*/comm 2>/dev/null && podman --remote --url unix://${DATA_DIR}/runner/run/podman/podman.sock info >/dev/null`,
+                ],
+                subcontainer,
+                {
+                  timeout: 10000,
+                  message: () => i18n('Runner is running'),
+                  errorMessage: i18n('The runner is not running'),
+                },
+              )
             : {
                 result: 'failure',
                 message: i18n(
