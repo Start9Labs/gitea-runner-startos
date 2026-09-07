@@ -1,53 +1,48 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '3.3.2:0',
+  version: '3.4.0:0',
   releaseNotes: {
-    en_US: `Updated Gitea Runner to 3.3.2.
+    en_US: `Updated Gitea Runner to 3.4.0.
 
-- Workflows can no longer set \`NODE_OPTIONS\` through \`$GITHUB_ENV\` or \`::set-env::\`, matching GitHub.
-- Encoded forms of secrets, including Base64 values, are now masked in job output.
-- Jobs and steps now report accurate results for \`continue-on-error\`, cancellations, and failing \`if:\` expressions.
-- Composite actions now resolve \`matrix\` and \`strategy\` values correctly, keep their inputs isolated from nested actions, and prevent container environment values from overriding job changes.
-- Node actions that depend on symlink-aware entry points now run correctly.
+- Adds \`GITEA_DOCKER_WORKSPACE\` for Compose bind mounts and removes the need to add \`bind_workdir\` workspace mounts to \`valid_volumes\`.
+- Makes cold action downloads 5–20 times faster and avoids network requests for cached actions.
+- Cleans up containers, networks, and volumes after jobs, and correctly fails steps or jobs when expression interpolation fails.
+- Updates \`golang.org/x/crypto\` to address CVE-2026-78662 and CVE-2026-56855.
 
-Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.3.2`,
-    es_ES: `Gitea Runner actualizado a 3.3.2.
+Full upstream release notes: https://gitea.com/gitea/runner/releases/tag/v3.4.0`,
+    es_ES: `Gitea Runner actualizado a 3.4.0.
 
-- Los flujos de trabajo ya no pueden establecer \`NODE_OPTIONS\` mediante \`$GITHUB_ENV\` ni \`::set-env::\`, igual que en GitHub.
-- Las formas codificadas de los secretos, incluidos los valores Base64, ahora se enmascaran en la salida de los trabajos.
-- Los trabajos y pasos ahora informan de resultados precisos para \`continue-on-error\`, las cancelaciones y las expresiones \`if:\` fallidas.
-- Las acciones compuestas ahora resuelven correctamente los valores \`matrix\` y \`strategy\`, mantienen sus entradas aisladas de las acciones anidadas e impiden que los valores del entorno del contenedor sobrescriban los cambios del trabajo.
-- Las acciones de Node que dependen de puntos de entrada compatibles con enlaces simbólicos ahora se ejecutan correctamente.
+- Añade \`GITEA_DOCKER_WORKSPACE\` para los montajes de Compose y elimina la necesidad de añadir los montajes de espacio de trabajo de \`bind_workdir\` a \`valid_volumes\`.
+- Acelera entre 5 y 20 veces las descargas de acciones sin caché y evita solicitudes de red para las acciones almacenadas en caché.
+- Limpia los contenedores, redes y volúmenes después de los trabajos, y marca correctamente como fallidos los pasos o trabajos cuando falla la interpolación de expresiones.
+- Actualiza \`golang.org/x/crypto\` para corregir CVE-2026-78662 y CVE-2026-56855.
 
-Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.3.2`,
-    de_DE: `Gitea Runner auf 3.3.2 aktualisiert.
+Notas de la versión completas: https://gitea.com/gitea/runner/releases/tag/v3.4.0`,
+    de_DE: `Gitea Runner auf 3.4.0 aktualisiert.
 
-- Workflows können \`NODE_OPTIONS\` nicht mehr über \`$GITHUB_ENV\` oder \`::set-env::\` setzen, wie bei GitHub.
-- Kodierte Formen von Secrets, einschließlich Base64-Werten, werden jetzt in der Job-Ausgabe maskiert.
-- Jobs und Schritte melden jetzt korrekte Ergebnisse für \`continue-on-error\`, Abbrüche und fehlgeschlagene \`if:\`-Ausdrücke.
-- Composite Actions lösen \`matrix\`- und \`strategy\`-Werte jetzt korrekt auf, halten ihre Eingaben von verschachtelten Actions getrennt und verhindern, dass Container-Umgebungswerte Änderungen des Jobs überschreiben.
-- Node-Actions, die symlinkfähige Einstiegspunkte benötigen, werden jetzt korrekt ausgeführt.
+- Fügt \`GITEA_DOCKER_WORKSPACE\` für Compose-Bind-Mounts hinzu und macht es unnötig, \`bind_workdir\`-Arbeitsbereichsmounts in \`valid_volumes\` aufzunehmen.
+- Beschleunigt nicht zwischengespeicherte Action-Downloads um das 5- bis 20-Fache und vermeidet Netzwerkanfragen für zwischengespeicherte Actions.
+- Bereinigt Container, Netzwerke und Volumes nach Jobs und lässt Schritte oder Jobs bei fehlgeschlagener Ausdrucksinterpolation korrekt fehlschlagen.
+- Aktualisiert \`golang.org/x/crypto\`, um CVE-2026-78662 und CVE-2026-56855 zu beheben.
 
-Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.3.2`,
-    pl_PL: `Zaktualizowano Gitea Runner do 3.3.2.
+Vollständige Versionshinweise: https://gitea.com/gitea/runner/releases/tag/v3.4.0`,
+    pl_PL: `Zaktualizowano Gitea Runner do 3.4.0.
 
-- Przepływy pracy nie mogą już ustawiać \`NODE_OPTIONS\` przez \`$GITHUB_ENV\` ani \`::set-env::\`, tak jak w GitHubie.
-- Zakodowane formy sekretów, w tym wartości Base64, są teraz maskowane w danych wyjściowych zadań.
-- Zadania i kroki zgłaszają teraz dokładne wyniki dla \`continue-on-error\`, anulowania i błędnych wyrażeń \`if:\`.
-- Akcje złożone poprawnie rozwiązują wartości \`matrix\` i \`strategy\`, izolują swoje dane wejściowe od zagnieżdżonych akcji i zapobiegają nadpisywaniu zmian zadania przez wartości środowiska kontenera.
-- Akcje Node zależne od punktów wejścia obsługujących dowiązania symboliczne działają teraz poprawnie.
+- Dodano \`GITEA_DOCKER_WORKSPACE\` dla montowań Compose i usunięto konieczność dodawania montowań obszaru roboczego \`bind_workdir\` do \`valid_volumes\`.
+- Pobieranie niebuforowanych akcji jest od 5 do 20 razy szybsze, a buforowane akcje nie wymagają żądań sieciowych.
+- Kontenery, sieci i woluminy są czyszczone po zadaniach, a błędy interpolacji wyrażeń prawidłowo powodują niepowodzenie kroku lub zadania.
+- Zaktualizowano \`golang.org/x/crypto\`, aby naprawić CVE-2026-78662 i CVE-2026-56855.
 
-Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.3.2`,
-    fr_FR: `Gitea Runner mis à jour vers 3.3.2.
+Pełne informacje o wydaniu: https://gitea.com/gitea/runner/releases/tag/v3.4.0`,
+    fr_FR: `Gitea Runner mis à jour vers 3.4.0.
 
-- Les workflows ne peuvent plus définir \`NODE_OPTIONS\` via \`$GITHUB_ENV\` ou \`::set-env::\`, comme sur GitHub.
-- Les formes encodées des secrets, notamment les valeurs Base64, sont désormais masquées dans la sortie des jobs.
-- Les jobs et les étapes signalent désormais des résultats exacts pour \`continue-on-error\`, les annulations et les expressions \`if:\` en échec.
-- Les actions composites résolvent correctement les valeurs \`matrix\` et \`strategy\`, isolent leurs entrées des actions imbriquées et empêchent les valeurs d'environnement du conteneur de remplacer les modifications du job.
-- Les actions Node qui dépendent de points d'entrée tenant compte des liens symboliques s'exécutent désormais correctement.
+- Ajoute \`GITEA_DOCKER_WORKSPACE\` pour les montages liés de Compose et évite d'ajouter les montages d'espace de travail \`bind_workdir\` à \`valid_volumes\`.
+- Accélère de 5 à 20 fois le téléchargement des actions non mises en cache et évite les requêtes réseau pour les actions mises en cache.
+- Nettoie les conteneurs, réseaux et volumes après les jobs, et fait correctement échouer les étapes ou les jobs en cas d'échec de l'interpolation d'une expression.
+- Met à jour \`golang.org/x/crypto\` pour corriger CVE-2026-78662 et CVE-2026-56855.
 
-Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.3.2`,
+Notes de version complètes : https://gitea.com/gitea/runner/releases/tag/v3.4.0`,
   },
   migrations: {
     // No data migration: the store schema is unchanged across this bump.
