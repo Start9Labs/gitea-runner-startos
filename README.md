@@ -96,9 +96,9 @@ None. The runner dials out to its forge and pulls job images; it accepts no inbo
 
 ## Installation and First-Run Flow
 
-Install seeds the store with defaults and nothing else. There is no task, and the service starts — but it will not do any work until you register it.
+Install seeds the store with defaults and leaves the service stopped until you start it. It will not do any work until you register it.
 
-Two gates apply before that, both enforced rather than advisory:
+Two gates apply before the daemon can run, both enforced rather than advisory:
 
 1. **Hardware.** `main` refuses to start on a device below 2 CPU cores or roughly a 4 GB machine's worth of memory, because every job is a full build. The message says so explicitly rather than failing obscurely later.
 2. **Gitea.** It must be installed and serving.
