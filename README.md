@@ -143,7 +143,7 @@ The `main` volume is copied wholesale — `sdk.Backups.ofVolumes('main')`. No du
 
 1. **Only the Gitea on this device.** There is no field for a remote forge; the address is resolved from the local dependency.
 2. **Registration tokens are single-use.** Re-running Configure needs a new one from Gitea.
-3. **Configuration applies on restart**, not immediately. The generated runner config leaves the job network at its default (an isolated per-job network), so jobs can reach the runner's cache. Jobs explicitly set to `container.network: bridge` cannot reach the cache; use the default or a user-defined network. Custom `valid_volumes` patterns matching nested paths require `**` rather than `*`.
+3. **Configuration applies on restart**, not immediately.
 4. **The service refuses to start on small hardware** — under 2 cores or roughly a 4 GB machine.
 5. **Emulated jobs are much slower than native**, and are opted into by adding a foreign-architecture label by hand.
 6. **Jobs run in a rootless engine inside the service**, which requires the two device grants named above, and on StartOS 0.4.0.1 and earlier a startup step to make those device nodes readable by the unprivileged user.
