@@ -72,7 +72,7 @@ Two models. One is what you supply; the other is the runner's own registration s
 | `labels`            | Comma-separated, in the runner's own `name:docker://image` or `name:host` syntax |
 | `capacity`          | How many jobs run at once                                                        |
 
-`store.json` strips keys it does not declare, and nothing else writes it. Everything else reaches the runner as environment on each start, including the connection to Gitea — whose address is resolved rather than stored.
+The package reads the declared `store.json` keys and merges updates into the file; unknown keys already on disk are retained. Everything else reaches the runner as environment on each start, including the connection to Gitea — whose address is resolved rather than stored.
 
 `USER` is set to the unprivileged account the daemon runs as, not left at the container's inherited `root`. The container engine resolves its subordinate UID and GID ranges by `$USER`, and finding none for `root` it falls back to a single-ID mapping — under which any job image carrying a file not owned by root fails to unpack.
 

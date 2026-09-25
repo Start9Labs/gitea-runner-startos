@@ -32,7 +32,13 @@ The first job on each label pulls its container image before anything else runs 
 
 ### Checking out your repository
 
-To check out the repository a workflow belongs to, use the standard action — it authenticates automatically with the job's token, so private repositories work with no extra setup:
+To check out the repository a workflow belongs to, use the runner's built-in action. It needs neither an action download nor Node in the job image, and uses the job's token by default:
+
+```yaml
+- uses: builtin:checkout
+```
+
+The standard checkout action also works and authenticates with the job's token:
 
 ```yaml
 - uses: actions/checkout@v4
