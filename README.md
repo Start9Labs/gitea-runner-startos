@@ -72,7 +72,7 @@ Two models. One is what you supply; the other is the runner's own registration s
 | `labels`            | Comma-separated, in the runner's own `name:docker://image` or `name:host` syntax |
 | `capacity`          | How many jobs run at once                                                        |
 
-`store.json` strips keys it does not declare, and nothing else writes it. Everything else reaches the runner as environment on each start, including the connection to Gitea — whose address is resolved rather than stored.
+The package reads the declared `store.json` keys and merges updates into the file; unknown keys already on disk are retained. Everything else reaches the runner as environment on each start, including the connection to Gitea — whose address is resolved rather than stored.
 
 `USER` is set to the unprivileged account the daemon runs as, not left at the container's inherited `root`. The container engine resolves its subordinate UID and GID ranges by `$USER`, and finding none for `root` it falls back to a single-ID mapping — under which any job image carrying a file not owned by root fails to unpack.
 
@@ -143,7 +143,7 @@ The `main` volume is copied wholesale — `sdk.Backups.ofVolumes('main')`. No du
 
 1. **Only the Gitea on this device.** There is no field for a remote forge; the address is resolved from the local dependency.
 2. **Registration tokens are single-use.** Re-running Configure needs a new one from Gitea.
-3. **Configuration applies on restart**, not immediately.
+3. **Configuration applies on restart**, not immediately. The generated runner config leaves the job network at its default (an isolated per-job network), so jobs can reach the runner's cache. Jobs explicitly set to `container.network: bridge` cannot reach the cache; use the default or a user-defined network. Custom `valid_volumes` patterns matching nested paths require `**` rather than `*`.
 4. **The service refuses to start on small hardware** — under 2 cores or roughly a 4 GB machine.
 5. **Emulated jobs are much slower than native**, and are opted into by adding a foreign-architecture label by hand.
 6. **Jobs run in a rootless engine inside the service**, which requires the two device grants named above, and on StartOS 0.4.0.1 and earlier a startup step to make those device nodes readable by the unprivileged user.
