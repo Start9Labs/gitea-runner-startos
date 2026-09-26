@@ -10,7 +10,7 @@ A CI/CD runner that executes Gitea Actions workflows for the **Gitea on this dev
 
 ## Getting set up
 
-This runner serves the Gitea on the same device, so install and start **Gitea** first.
+This runner serves the Gitea on the same device, so install and start **Gitea** first, with Gitea Actions enabled (the default).
 
 1. In Gitea, create a runner registration token under **Site / Organization / Repository Settings → Actions → Runners → Create new Runner**, and copy it.
 2. Run the **Configure** action here and paste the token. Adjust the runner name, labels, and concurrent-jobs count if you like — the default `ubuntu-latest` label runs jobs in a standard Ubuntu image.
