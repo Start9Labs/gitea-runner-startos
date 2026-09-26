@@ -20,6 +20,7 @@ const dict = {
   'Runner configuration saved. Restart the service to (re)register with these settings.': 16,
   'Gitea is not yet reachable on the internal network. The runner will connect once its Gitea dependency is running.': 17,
   'The runner is not running': 18,
+  'Gitea Actions must be enabled for Gitea Runner to run jobs.': 19,
 }
 
 export type I18nKey = keyof typeof dict
