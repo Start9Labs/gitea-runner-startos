@@ -53,9 +53,13 @@ done
 if [ ! -f "$DATA/.runner" ]; then
   if [ -n "$INSTANCE_URL" ] && [ -n "$RUNNER_TOKEN" ]; then
     echo "Registering runner '$RUNNER_NAME' with $INSTANCE_URL ..."
-    gitea-runner register --no-interactive \
+    if ! gitea-runner register --no-interactive \
       --instance "$INSTANCE_URL" --token "$RUNNER_TOKEN" \
-      --name "$RUNNER_NAME" --config "$CONFIG"
+      --name "$RUNNER_NAME" --config "$CONFIG"; then
+      echo "gitea-runner: registration with $INSTANCE_URL failed. Run the 'Configure'" \
+           "action with a fresh registration token, then restart this service." >&2
+      exec sleep infinity
+    fi
   else
     echo "gitea-runner: not configured. Run the 'Configure' action to set a" \
          "Gitea URL + registration token, then restart this service." >&2
@@ -64,4 +68,26 @@ if [ ! -f "$DATA/.runner" ]; then
   fi
 fi
 
-exec gitea-runner daemon --config "$CONFIG"
+# The daemon dials the address saved at registration, which goes stale when Gitea's bridge port changes.
+sed -i "s|\"address\": \"[^\"]*\"|\"address\": \"$INSTANCE_URL\"|" "$DATA/.runner"
+
+LOG="$DATA/run/daemon.log"
+exec 3> >(tee "$LOG")
+tee_pid=$!
+gitea-runner daemon --config "$CONFIG" >&3 2>&1 &
+pid=$!
+exec 3>&-
+trap 'kill -TERM "$pid" 2>/dev/null' TERM INT
+status=0
+wait "$pid" || status=$?
+while kill -0 "$pid" 2>/dev/null; do status=0; wait "$pid" || status=$?; done
+wait "$tee_pid" || true
+
+# Gitea answers "unregistered runner" once its database no longer holds this registration.
+if grep -qE '^Error: ([a-z_]+: )?(unregistered runner|runner is no longer registered with the server; please register it again)$' "$LOG"; then
+  rm -f "$DATA/.runner"
+  echo "gitea-runner: Gitea no longer recognizes this runner. Run the 'Configure'" \
+       "action with a fresh registration token, then restart this service." >&2
+  exec sleep infinity
+fi
+exit "$status"
