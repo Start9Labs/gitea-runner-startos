@@ -84,7 +84,7 @@ while kill -0 "$pid" 2>/dev/null; do status=0; wait "$pid" || status=$?; done
 wait "$tee_pid" || true
 
 # Gitea answers "unregistered runner" once its database no longer holds this registration.
-if grep -qE 'unregistered runner|no longer registered' "$LOG"; then
+if grep -qE '^Error: ([a-z_]+: )?(unregistered runner|runner is no longer registered with the server; please register it again)$' "$LOG"; then
   rm -f "$DATA/.runner"
   echo "gitea-runner: Gitea no longer recognizes this runner. Run the 'Configure'" \
        "action with a fresh registration token, then restart this service." >&2
