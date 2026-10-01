@@ -58,12 +58,12 @@ One volume, shared between the package's state and the runner's working area.
 
 ## File Models
 
-Two models. One is what you supply; the other is the runner's own registration state, which the package only ever reads.
+Two models. One is what you supply; the other is the runner's own registration state, which the package reads and, at start, corrects or discards.
 
-| File             | Format | Modelled                | Written by                           |
-| ---------------- | ------ | ----------------------- | ------------------------------------ |
-| `store.json`     | JSON   | Yes — `FileHelper.json` | Every init, and the Configure action |
-| `runner/.runner` | JSON   | Read-only               | The runner itself, when it registers |
+| File             | Format | Modelled                | Written by                                                     |
+| ---------------- | ------ | ----------------------- | -------------------------------------------------------------- |
+| `store.json`     | JSON   | Yes — `FileHelper.json` | Every init, and the Configure action                           |
+| `runner/.runner` | JSON   | Read-only               | The runner itself, when it registers; `entrypoint.sh` at start |
 
 | Key                 | Notes                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
@@ -77,6 +77,8 @@ The package reads the declared `store.json` keys and merges updates into the fil
 `USER` is set to the unprivileged account the daemon runs as, not left at the container's inherited `root`. The container engine resolves its subordinate UID and GID ranges by `$USER`, and finding none for `root` it falls back to a single-ID mapping — under which any job image carrying a file not owned by root fails to unpack.
 
 **`runner/.runner` is the ground truth for whether this runner is registered**, and it is why the health check does not simply look at whether a token is stored. A runner registered out of band, or restored from a backup whose stored token was cleared, is fully working while carrying no token here; the state file reflects that and the token does not.
+
+The daemon dials the `address` saved in `.runner`, not the environment, so `entrypoint.sh` rewrites that field to Gitea's current bridge address on every start. When Gitea answers `unregistered runner` (its database no longer holds the registration, as after Gitea is reinstalled), or registering with the stored token fails, the entrypoint deletes `.runner` and idles instead of exiting, so the health check asks for Configure rather than the service restarting in a loop.
 
 ## Dependencies
 

@@ -18,6 +18,8 @@ This runner serves the Gitea on the same device, so install and start **Gitea** 
 
 > Running **Configure** re-registers the runner on the next start, so supply a fresh token each time (registration tokens are single-use).
 
+If Gitea is reinstalled, it no longer knows this runner: the **Runner** health check asks you to run **Configure** with a fresh token, then restart.
+
 ## Using the Gitea Runner
 
 Once it is online, Gitea dispatches workflow jobs to it automatically — there is nothing to drive here day to day. Follow progress and read job logs in Gitea's **Actions** tab; here, the **Runner** health check shows whether it is up, and the service logs show registration and startup.
