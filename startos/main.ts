@@ -108,7 +108,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         // a runner registered out-of-band has a live `.runner` but no token here.
         trigger: sdk.trigger.cooldownTrigger(30000),
         fn: async () =>
-          (await runnerState.read().const(effects))
+          (await runnerState.read().once())
             ? sdk.healthCheck.runHealthScript(
                 [
                   'bash',

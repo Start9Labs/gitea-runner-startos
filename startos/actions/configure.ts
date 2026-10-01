@@ -55,7 +55,7 @@ export const configure = sdk.Action.withInput(
   inputSpec,
 
   async ({ effects }) => {
-    const s = await storeJson.read().const(effects)
+    const s = await storeJson.read().once()
     if (!s) return null
     return {
       registrationToken: s.registrationToken || undefined,
