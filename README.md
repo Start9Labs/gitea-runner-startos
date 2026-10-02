@@ -138,7 +138,7 @@ One check, on the `primary` daemon.
 | ------------------ | ------------------------------------------------------------------------------------------- | ------------ |
 | `primary` "Runner" | Registration state file present, then the runner process alive and the Podman API answering | 60 seconds   |
 
-Before registration it fails and names the action to run. After it, the check runs a script in the service container every 30 seconds: a `gitea-runner` process must appear in `/proc`, and `podman --remote info` must succeed against the API socket the runner drives. Both have to hold — the runner exits when the engine is unreachable, and an engine with no runner behind it serves nothing. Whether Gitea is currently handing it jobs is visible in Gitea, not here.
+Before registration it fails and names the action to run. After it, the check runs a script in the service container every 30 seconds: a `gitea-runner` process must appear in `/proc`, and `podman --remote info` must succeed against the API socket the runner drives. Both have to hold — the runner exits when the engine is unreachable, and an engine with no runner behind it serves nothing. Whether Gitea is currently handing it jobs is visible in Gitea, not here. Task-start messages in the service logs include task, job and run identifiers for matching a job to its workflow run.
 
 ## Backups and Restore
 

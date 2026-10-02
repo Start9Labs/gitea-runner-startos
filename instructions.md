@@ -22,7 +22,7 @@ If Gitea is reinstalled, it no longer knows this runner: the **Runner** health c
 
 ## Using the Gitea Runner
 
-Once it is online, Gitea dispatches workflow jobs to it automatically — there is nothing to drive here day to day. Follow progress and read job logs in Gitea's **Actions** tab; here, the **Runner** health check shows whether it is up, and the service logs show registration and startup.
+Once it is online, Gitea dispatches workflow jobs to it automatically — there is nothing to drive here day to day. Follow progress and read job logs in Gitea's **Actions** tab; here, the **Runner** health check shows whether it is up, and the service logs show registration and startup. When a task starts, the service logs include task, job and run identifiers to help match it to a workflow run.
 
 ### Labels and architecture
 
