@@ -10,5 +10,5 @@ import { sdk } from '../sdk'
 // permissive — only the file's existence matters here.
 export const runnerState = FileHelper.json(
   { base: sdk.volumes.main, subpath: './runner/.runner' },
-  z.object({}).passthrough(),
+  z.looseObject({}),
 )
