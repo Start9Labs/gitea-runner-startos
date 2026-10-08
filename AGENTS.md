@@ -18,18 +18,24 @@ Freshly scaffolded? Work the
 guide page, not a file in this repo — read it, don't copy it in.
 
 Keep `README.md` (technical reference for an AI support or administering agent) and
-`instructions.md` (end-user docs) in sync with your changes.
+`instructions.md` (end-user docs) in sync with your changes. This file restates neither:
+whoever changes the package has both, so it carries only what they don't — repo mechanics,
+a change that looks right and is not, where the next thing gets added, a naming trap, a
+build or test invocation particular to this repo.
 
-**Bugs and feature requests are GitHub issues on this repo** — file them as you find them.
+**Fix a defect you spot rather than reporting it** — you have the package open and the
+context to be sure. File **a GitHub issue on this repo** only when the call isn't yours to
+make: you can't pin the cause down, two defensible fixes exist, or it's too large to ride on
+the work in hand. An open issue is a report, not a queue — implement one when you're asked
+to or when it's labelled `Approved`, then close it with `Closes #<n>`.
+
 Don't record work in the repo instead: no `TODO.md`, no `NOTES.md`, no `PLAN.md`. What you
 verified, tried, and decided belongs in the commit message and the PR body.
 
 ## This repo
 
-- **This package and `forgejo-runner-startos` are siblings but not twins.** Same shape — nested rootless Podman, the same hardware gate, the same `own-data` oneshot — but the registration models differ: Gitea uses a single-use registration token plus a runner name, Forgejo uses a persistent UUID + token pair. Don't port one's credential handling onto the other.
-- **Health keys off `runner/.runner`, not the stored token.** A runner registered out of band, or restored from a backup whose token was cleared, is working and has no token here. The state file is ground truth; the token is only an input.
-- **Capacity must be applied with `config set`, not a sed.** `gitea-runner config init` writes a _minimal_ config with no `capacity` key at all, so forgejo-runner's `sed -i 's/^  capacity: .*/…/'` has nothing to match here. `config set runner.capacity` is what the generated file itself points at, and `config get` reads the value back.
-- **`git` in the image is load-bearing.** The runner fetches `uses:` actions with the git CLI, so without it every `uses:` step fails at fetch time with an exec error rather than anything that names the cause.
-- **`clean-runtime` requires `own-data`, not `[]`.** Chain entries with no requirements run concurrently, and `own-data`'s `chown -R` walks the tree `clean-runtime` deletes. Racing them fails the chown with ENOENT, so `own-data` reports failure and retries before it succeeds — log noise for nothing.
-- **A daemon's `ready.fn` overwrites the crash status the SDK sets when the process exits.** So a `fn` that reports on registration alone paints a crash loop green on its next poll — `primary`'s check has to observe the process itself.
-- **`own-data` chowns only `runner/`, not the volume root.** StartOS's `store.json` lives at the same mount and must keep its own ownership.
+- **Don't port `forgejo-runner-startos`'s credential handling here.** The two share a shape, but Gitea registers with a single-use token plus a runner name and Forgejo with a persistent UUID and token pair.
+- **Keep `primary`'s check keyed off `runner/.runner` and observing the process.** The stored token is absent on a runner registered out of band, and a daemon's `ready.fn` overwrites the crash status the SDK sets, so a check on registration alone paints a crash loop green.
+- **Apply capacity with `config set`, not a sed.** `gitea-runner config init` writes no `capacity` key, so a sed over the generated config has nothing to match.
+- **`own-data` chowns only `runner/`, and `clean-runtime` requires it.** `store.json` shares the mount and keeps its own ownership; run concurrently, the `chown -R` walks the tree `clean-runtime` deletes and fails with ENOENT.
+- **Keep `git` in the image.** The runner fetches `uses:` actions with the git CLI, and without it every `uses:` step fails with an exec error that doesn't name the cause.

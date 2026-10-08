@@ -13,7 +13,7 @@ const dict = {
   Labels: 9,
   'Comma-separated runner labels — syntax "name:docker://image" or "name:host". Adding a foreign-arch label also serves emulated jobs, which are much slower; prefer a native runner per architecture.': 10,
   'Concurrent Jobs': 11,
-  'How many jobs this runner executes at once.': 12,
+  "Every job running at the same time adds its own build's CPU and memory use on this device. Raise it only if the device can carry several builds at once.": 12,
   Configure: 13,
   'Register this runner with the Gitea on this device. Saving re-registers on the next restart, so provide a fresh registration token each time.': 14,
   Saved: 15,

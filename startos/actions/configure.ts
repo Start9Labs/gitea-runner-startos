@@ -30,7 +30,9 @@ const inputSpec = InputSpec.of({
   }),
   capacity: Value.number({
     name: i18n('Concurrent Jobs'),
-    description: i18n('How many jobs this runner executes at once.'),
+    description: i18n(
+      "Every job running at the same time adds its own build's CPU and memory use on this device. Raise it only if the device can carry several builds at once.",
+    ),
     required: true,
     default: 1,
     min: 1,
