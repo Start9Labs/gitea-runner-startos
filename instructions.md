@@ -26,7 +26,7 @@ Once it is online, Gitea dispatches workflow jobs to it automatically — there 
 
 ### Labels and architecture
 
-A workflow's `runs-on:` is matched against the runner's labels. Add a foreign-architecture label in **Configure** to also serve emulated jobs for that architecture — they work, but are much slower than native, so prefer a separate runner on native hardware for each architecture you build for regularly.
+Each job must have a nonempty `runs-on:` matching the runner's labels, unless it calls a reusable workflow. Add a foreign-architecture label in **Configure** to also serve emulated jobs for that architecture — they work, but are much slower than native, so prefer a separate runner on native hardware for each architecture you build for regularly.
 
 ### First run
 
@@ -34,11 +34,13 @@ The first job on each label pulls its container image before anything else runs 
 
 ### Checking out your repository
 
-To check out the repository a workflow belongs to, use the runner's built-in action. It needs neither an action download nor Node in the job image, and uses the job's token by default:
+To check out the repository a workflow belongs to, use the runner's built-in action. It needs neither an action download nor Node, and uses the job's token by default. Your job image must include Git; it must also be able to reach Gitea and trust its certificate if you use HTTPS. SSH checkouts additionally need an SSH client, and LFS checkouts need Git LFS:
 
 ```yaml
 - uses: builtin:checkout
 ```
+
+Checkout removes untracked and ignored files by default. Set `with: { clean: false }` if you need to keep them. It supports SSH keys, submodules, LFS, sparse checkout and partial clones, and persists credentials for later fetches and pushes unless you set `persist-credentials: false`. A tag-triggered checkout fails if the tag moved after the workflow started.
 
 The standard checkout action also works and authenticates with the job's token:
 
