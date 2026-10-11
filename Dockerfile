@@ -1,6 +1,6 @@
 # gitea-runner binary, pulled from the official multi-arch image (pinned).
 # Bump the tag here and the version in startos/versions/current.ts together.
-FROM gitea/runner:4.1.0 AS runner
+FROM gitea/runner:5.0.0 AS runner
 
 FROM debian:trixie-slim
 
@@ -11,7 +11,7 @@ FROM debian:trixie-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       podman fuse-overlayfs uidmap iproute2 iptables nftables aardvark-dns \
-      passt slirp4netns ca-certificates git \
+      passt slirp4netns ca-certificates git openssh-client \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 

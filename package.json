@@ -1,10 +1,10 @@
 {
   "name": "gitea-runner-startos",
-  "dependencies": {
-    "@start9labs/start-sdk": "3.0.3",
-    "gitea-startos": "github:Start9Labs/gitea-startos#next"
+  "scripts": {
+    "check": "tsc --noEmit"
   },
-  "overrides": {
-    "@start9labs/start-sdk": "$@start9labs/start-sdk"
+  "dependencies": {
+    "@start9labs/start-sdk": "3.0.4",
+    "gitea-startos": "github:Start9Labs/gitea-startos#next"
   }
 }

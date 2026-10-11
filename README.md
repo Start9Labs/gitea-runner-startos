@@ -44,7 +44,7 @@ The image is built here: upstream's runner binary is copied onto a Debian base c
 | Command       | The repo's `entrypoint.sh`, run as the unprivileged `app` user         |
 | Subcontainer  | `gitea-runner-sub` — the `primary` daemon, and the one to `attach` to  |
 
-The manifest declares two device grants that this arrangement requires: **userspace filesystems** for the storage driver, and **virtual networking** for job networking. Without either, the nested engine cannot start a job container. The image also carries `git`, because the runner fetches `uses:` actions with the git CLI and every such step fails without it.
+The manifest declares two device grants that this arrangement requires: **userspace filesystems** for the storage driver, and **virtual networking** for job networking. Without either, the nested engine cannot start a job container. The image also carries `git` and the OpenSSH client for downloading actions and reusable workflows, including SSH URLs. These tools live in the runner container, not in arbitrary job images; the job-image requirements for `builtin:checkout` are described in `instructions.md`.
 
 Three oneshots run as root before the daemon. `own-data` creates the runner's working directory on the volume and hands it to `app`, leaving the rest of the volume alone. `device-perms` re-opens `/dev/net/tun` and `/dev/fuse` to mode 0666: StartOS 0.4.0.1 and earlier can create those granted nodes root-only, and the engine opens both as the unprivileged user. It is idempotent and becomes a no-op once the OS-side fix ships. `clean-runtime` removes the engine's runtime directory. `XDG_RUNTIME_DIR` sits on the persistent volume, so the boot ID podman caches there survives a reboot and podman refuses to start against it. It runs after `own-data` rather than beside it, so the two never walk the same tree at once, and it removes no durable state: the entrypoint recreates the directory on every start, and the image layer store is a sibling that is left alone.
 
@@ -72,7 +72,7 @@ Two models. One is what you supply; the other is the runner's own registration s
 | `labels`            | Comma-separated, in the runner's own `name:docker://image` or `name:host` syntax |
 | `capacity`          | How many jobs run at once                                                        |
 
-The package reads the declared `store.json` keys and merges updates into the file; unknown keys already on disk are retained. Everything else reaches the runner as environment on each start, including the connection to Gitea — whose address is resolved rather than stored.
+The package reads the declared `store.json` keys and merges updates into the file; unknown keys already on disk are retained. The entrypoint regenerates `runner/config.yaml` on every start, setting `runner.capacity` and `runner.labels` from the store and leaving all other options at upstream defaults. Hand edits to that config do not survive a restart. Everything else reaches the runner as environment on each start, including the connection to Gitea — whose address is resolved rather than stored.
 
 `USER` is set to the unprivileged account the daemon runs as, not left at the container's inherited `root`. The container engine resolves its subordinate UID and GID ranges by `$USER`, and finding none for `root` it falls back to a single-ID mapping — under which any job image carrying a file not owned by root fails to unpack.
 
