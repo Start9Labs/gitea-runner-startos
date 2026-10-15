@@ -10,6 +10,7 @@ export const current = VersionInfo.of({
 - Fixes action copies on rootless Podman with images that symlink /var/run, and PATH handling in cross-architecture jobs.
 - Ignores workflow container --entrypoint options with a warning instead of breaking the container.
 - Includes security updates to Go and networking dependencies. Updated start-sdk to 3.0.6.
+- An unconfigured runner now raises a critical Configure task. Save a registration token before starting; existing registrations need no setup task.
 
 [Full upstream release notes](https://gitea.com/gitea/runner/releases/tag/v5.1.0)`,
     es_ES: `Gitea Runner actualizado a 5.1.0.
@@ -19,6 +20,7 @@ export const current = VersionInfo.of({
 - Corrige la copia de acciones en Podman sin privilegios con imágenes que usan un enlace simbólico para /var/run y la gestión de PATH en trabajos de otra arquitectura.
 - Ignora las opciones --entrypoint de los contenedores del flujo con una advertencia en lugar de romper el contenedor.
 - Incluye actualizaciones de seguridad de Go y las dependencias de red. start-sdk actualizado a 3.0.6.
+- Un ejecutor sin configurar crea una tarea crítica Configurar. Guarde un token de registro antes de iniciar; los registros existentes no necesitan esta tarea.
 
 [Notas completas de la versión](https://gitea.com/gitea/runner/releases/tag/v5.1.0)`,
     de_DE: `Gitea Runner auf 5.1.0 aktualisiert.
@@ -28,6 +30,7 @@ export const current = VersionInfo.of({
 - Behebt das Kopieren von Actions unter rootless Podman bei Images mit einem Symlink für /var/run sowie die PATH-Verarbeitung bei Jobs für andere Architekturen.
 - Ignoriert --entrypoint-Optionen in Workflow-Containern mit einer Warnung, statt den Container unbrauchbar zu machen.
 - Enthält Sicherheitsupdates für Go und Netzwerkabhängigkeiten. start-sdk auf 3.0.6 aktualisiert.
+- Ein unkonfigurierter Runner erstellt eine kritische Aufgabe „Konfigurieren“. Speichern Sie vor dem Start ein Registrierungs-Token; bestehende Registrierungen benötigen keine Einrichtungsaufgabe.
 
 [Vollständige Versionshinweise](https://gitea.com/gitea/runner/releases/tag/v5.1.0)`,
     pl_PL: `Zaktualizowano Gitea Runner do 5.1.0.
@@ -37,6 +40,7 @@ export const current = VersionInfo.of({
 - Naprawia kopiowanie akcji w Podmanie bez uprawnień z obrazami używającymi dowiązania symbolicznego dla /var/run oraz obsługę PATH w zadaniach dla innych architektur.
 - Ignoruje opcje --entrypoint kontenerów przepływu z ostrzeżeniem zamiast psuć kontener.
 - Zawiera aktualizacje bezpieczeństwa Go i zależności sieciowych. Zaktualizowano start-sdk do 3.0.6.
+- Nieskonfigurowany runner tworzy krytyczne zadanie Konfiguruj. Zapisz token rejestracji przed uruchomieniem; istniejące rejestracje nie wymagają tego zadania.
 
 [Pełne informacje o wydaniu](https://gitea.com/gitea/runner/releases/tag/v5.1.0)`,
     fr_FR: `Gitea Runner mis à jour vers la version 5.1.0.
@@ -46,6 +50,7 @@ export const current = VersionInfo.of({
 - Corrige la copie des actions avec Podman sans privilèges et les images utilisant un lien symbolique pour /var/run, ainsi que la gestion de PATH dans les tâches pour une autre architecture.
 - Ignore les options --entrypoint des conteneurs de workflow avec un avertissement au lieu de casser le conteneur.
 - Inclut des mises à jour de sécurité de Go et des dépendances réseau. start-sdk mis à jour vers 3.0.6.
+- Un runner non configuré crée une tâche critique Configurer. Enregistrez un jeton avant de démarrer ; les enregistrements existants ne nécessitent pas cette tâche.
 
 [Notes de version complètes](https://gitea.com/gitea/runner/releases/tag/v5.1.0)`,
   },

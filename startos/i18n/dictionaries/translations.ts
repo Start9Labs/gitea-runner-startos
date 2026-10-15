@@ -22,6 +22,7 @@ export default {
     17: 'Gitea aún no es accesible en la red interna. El ejecutor se conectará una vez que su dependencia de Gitea esté en ejecución.',
     18: 'El ejecutor no está en ejecución',
     19: 'Gitea Actions debe estar activado para que Gitea Runner pueda ejecutar trabajos.',
+    20: 'El ejecutor no está registrado',
   },
   de_DE: {
     0: 'Dieses Gerät erfüllt nicht die Mindestanforderungen zum Ausführen von CI-Aufträgen (4 GB RAM und 2 CPU-Kerne).',
@@ -44,6 +45,7 @@ export default {
     17: 'Gitea ist im internen Netzwerk noch nicht erreichbar. Der Runner verbindet sich, sobald seine Gitea-Abhängigkeit läuft.',
     18: 'Der Runner läuft nicht',
     19: 'Gitea Actions muss aktiviert sein, damit Gitea Runner Jobs ausführen kann.',
+    20: 'Der Runner ist nicht registriert',
   },
   pl_PL: {
     0: 'To urządzenie nie spełnia minimalnych wymagań do uruchamiania zadań CI (4 GB RAM i 2 rdzenie CPU).',
@@ -66,6 +68,7 @@ export default {
     17: 'Gitea nie jest jeszcze osiągalne w sieci wewnętrznej. Runner połączy się, gdy jego zależność Gitea będzie uruchomiona.',
     18: 'Runner nie działa',
     19: 'Gitea Actions musi być włączone, aby Gitea Runner mógł wykonywać zadania.',
+    20: 'Runner nie jest zarejestrowany',
   },
   fr_FR: {
     0: 'Cet appareil ne répond pas aux exigences minimales pour exécuter des tâches CI (4 Go de RAM et 2 cœurs de CPU).',
@@ -88,5 +91,6 @@ export default {
     17: "Gitea n'est pas encore accessible sur le réseau interne. L'exécuteur se connectera une fois que sa dépendance Gitea sera en cours d'exécution.",
     18: "L'exécuteur n'est pas en cours d'exécution",
     19: 'Gitea Actions doit être activé pour que Gitea Runner puisse exécuter des tâches.',
+    20: "L'exécuteur n'est pas enregistré",
   },
 } satisfies Record<string, LangDict>
