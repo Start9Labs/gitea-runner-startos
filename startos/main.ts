@@ -125,9 +125,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
               )
             : {
                 result: 'failure',
-                message: i18n(
-                  'Run the Configure action to connect this runner to a Gitea instance',
-                ),
+                message: i18n('The runner is not registered'),
               },
       },
       requires: ['own-data', 'device-perms', 'clean-runtime'],

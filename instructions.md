@@ -10,15 +10,15 @@ A CI/CD runner that executes Gitea Actions workflows for the **Gitea on this dev
 
 ## Getting set up
 
-This runner serves the Gitea on the same device, so install and start **Gitea** first, with Gitea Actions enabled (the default).
+This runner serves the Gitea on the same device, so install and start **Gitea** first, with Gitea Actions enabled (the default). A critical **Configure** task keeps an unconfigured runner stopped until you save a registration token.
 
 1. In Gitea, create a runner registration token under **Site / Organization / Repository Settings → Actions → Runners → Create new Runner**, and copy it.
-2. Run the **Configure** action here and paste the token. Adjust the runner name, labels, and concurrent-jobs count if you like — the default `ubuntu-latest` label runs jobs in a standard Ubuntu image.
+2. Open the **Configure** task here and paste the token. Adjust the runner name, labels, and concurrent-jobs count if you like — the default `ubuntu-latest` label runs jobs in a standard Ubuntu image.
 3. Start (or restart) the service. It registers with Gitea and begins picking up jobs; it should appear as **Online** in Gitea's Runners.
 
 > Running **Configure** re-registers the runner on the next start, so supply a fresh token each time (registration tokens are single-use).
 
-If Gitea is reinstalled, it no longer knows this runner: the **Runner** health check asks you to run **Configure** with a fresh token, then restart.
+If Gitea is reinstalled, it no longer knows this runner: the **Runner** health check reports that it is not registered. Run **Configure** with a fresh token, then restart. The same applies if registration fails with an invalid or spent token.
 
 ## Using the Gitea Runner
 

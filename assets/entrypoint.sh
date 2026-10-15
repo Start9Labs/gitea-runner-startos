@@ -62,7 +62,7 @@ if [ ! -f "$DATA/.runner" ]; then
     fi
   else
     echo "gitea-runner: not configured. Run the 'Configure' action to set a" \
-         "Gitea URL + registration token, then restart this service." >&2
+         "registration token, then restart this service." >&2
     # Stay alive so the health check can report 'needs config' instead of crash-looping.
     exec sleep infinity
   fi

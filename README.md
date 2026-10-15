@@ -78,7 +78,7 @@ The package reads the declared `store.json` keys and merges updates into the fil
 
 **`runner/.runner` is the ground truth for whether this runner is registered**, and it is why the health check does not simply look at whether a token is stored. A runner registered out of band, or restored from a backup whose stored token was cleared, is fully working while carrying no token here; the state file reflects that and the token does not.
 
-The daemon dials the `address` saved in `.runner`, not the environment, so `entrypoint.sh` rewrites that field to Gitea's current bridge address on every start. When Gitea answers `unregistered runner` (its database no longer holds the registration, as after Gitea is reinstalled), or registering with the stored token fails, the entrypoint deletes `.runner` and idles instead of exiting, so the health check asks for Configure rather than the service restarting in a loop.
+The daemon dials the `address` saved in `.runner`, not the environment, so `entrypoint.sh` rewrites that field to Gitea's current bridge address on every start. When Gitea answers `unregistered runner` (its database no longer holds the registration, as after Gitea is reinstalled), or registering with the stored token fails, the entrypoint deletes `.runner` and idles instead of exiting, so the health check reports missing registration rather than the service restarting in a loop. Recover by running Configure with a fresh token, then restarting.
 
 ## Dependencies
 
@@ -100,14 +100,14 @@ None. The runner dials out to its forge and pulls job images; it accepts no inbo
 
 ## Installation and First-Run Flow
 
-Install seeds the store with defaults and leaves the service stopped until you start it. It will not do any work until you register it.
+Install seeds the store with defaults. On every init, a watcher raises a critical **Configure** task when neither a registration token nor `runner/.runner` is present. The task blocks startup until you save a token. A registered runner needs no setup task, even if its stored token is empty.
 
 Two gates apply before the daemon can run, both enforced rather than advisory:
 
 1. **Hardware.** `main` refuses to start on a device below 2 CPU cores or roughly a 4 GB machine's worth of memory, because every job is a full build. The message says so explicitly rather than failing obscurely later.
 2. **Gitea.** It must be installed and serving.
 
-Then run [Configure](#actions) with a registration token from Gitea's **Settings → Actions → Runners → Create new Runner**, and restart. Registration happens on that restart, at which point the runner writes its state file and the health check turns green.
+Complete the **Configure** task with a registration token from Gitea's **Settings → Actions → Runners → Create new Runner**, then start the service. Registration happens at startup, at which point the runner writes its state file and the health check turns green. A saved token permits startup; it is not proof of registration.
 
 ## Actions
 
@@ -124,11 +124,12 @@ Registers the runner with Gitea and sets how it advertises itself.
 
 ## Tasks
 
-None of its own, so the service is never held on a prompt and its ordinary controls are always available. It raises one on its dependency:
+One setup task of its own and one on its dependency:
 
-| Task      | On    | Severity   | Raised when                   | Cleared when                |
-| --------- | ----- | ---------- | ----------------------------- | --------------------------- |
-| Configure | Gitea | `critical` | Gitea's Enable Actions is off | Enable Actions is turned on |
+| Task      | On           | Severity   | Raised when                                   | Cleared when                          |
+| --------- | ------------ | ---------- | --------------------------------------------- | ------------------------------------- |
+| Configure | Gitea Runner | `critical` | No stored registration token and no `.runner` | A token is saved or `.runner` appears |
+| Configure | Gitea        | `critical` | Gitea's Enable Actions is off                 | Enable Actions is turned on           |
 
 ## Health Checks
 
@@ -138,7 +139,7 @@ One check, on the `primary` daemon.
 | ------------------ | ------------------------------------------------------------------------------------------- | ------------ |
 | `primary` "Runner" | Registration state file present, then the runner process alive and the Podman API answering | 60 seconds   |
 
-Before registration it fails and names the action to run. After it, the check runs a script in the service container every 30 seconds: a `gitea-runner` process must appear in `/proc`, and `podman --remote info` must succeed against the API socket the runner drives. Both have to hold — the runner exits when the engine is unreachable, and an engine with no runner behind it serves nothing. Whether Gitea is currently handing it jobs is visible in Gitea, not here. Task-start messages in the service logs include task, job and run identifiers for matching a job to its workflow run.
+Before registration it reports that the runner is not registered. The setup task handles a missing token; an invalid or spent token still needs replacing through Configure. After registration, the check runs a script in the service container every 30 seconds: a `gitea-runner` process must appear in `/proc`, and `podman --remote info` must succeed against the API socket the runner drives. Both have to hold — the runner exits when the engine is unreachable, and an engine with no runner behind it serves nothing. Whether Gitea is currently handing it jobs is visible in Gitea, not here. Task-start messages in the service logs include task, job and run identifiers for matching a job to its workflow run.
 
 ## Backups and Restore
 
@@ -188,6 +189,7 @@ interfaces: {} # none; the runner accepts no inbound connections
 actions:
   - configure
 tasks:
+  - { package: gitea-runner, action: configure, severity: critical } # while token and registration are both absent
   - { package: gitea, action: configure, severity: critical } # while Gitea Actions is disabled
 health_checks:
   - primary # displayed "Runner"; registration, then runner + engine liveness
