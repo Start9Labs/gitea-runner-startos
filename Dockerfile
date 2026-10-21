@@ -1,35 +1,29 @@
-# gitea-runner binary, pulled from the official multi-arch image (pinned).
-# Bump the tag here and the version in startos/versions/current.ts together.
-FROM gitea/runner:5.1.0 AS runner
+ARG BINFMT_IMAGE
+FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie AS runner
+WORKDIR /src
+COPY upstream/ ./
+COPY patches/ /patches/
+RUN for file in /patches/*.patch; do git apply "$file"; done
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go test -short -run '^Test(RemoteMetadataAndFallbackBoundary|RemoteDockerBuildBoundary|ActionBundleReadWriteBoundary|StepActionLocalTest|StepActionRemote|PatchBundle|PatchActionsAtTheContainerCopy|ExecAsDockerHoldsCloneLockForRemoteUncached|TrustedRootCA|SerialJobs|DefaultParallelJobs|DockerImagePlatform)' ./act/runner \
+ && CGO_ENABLED=0 go test -short ./act/container ./internal/app/run ./internal/app/cmd ./internal/pkg/config ./internal/pkg/labels ./internal/app/poll
+ARG TARGETOS
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags netgo,osusergo \
+      -ldflags '-s -w -X gitea.com/gitea/runner/internal/pkg/ver.version=v5.1.0' \
+      -o /bin/gitea-runner .
+FROM $BINFMT_IMAGE AS binfmt
 
 FROM debian:trixie-slim
-
-# Rootless Podman + its prerequisites (fuse-overlayfs storage, pasta/slirp4netns
-# networking, nftables for netavark). See start-docs recipe-nested-oci-runtime.
-# Also git: the runner fetches `uses:` actions with the git CLI — without it every
-# `uses:` step fails at the action fetch (exec: "git": executable file not found in $PATH).
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      podman fuse-overlayfs uidmap iproute2 iptables nftables aardvark-dns \
-      passt slirp4netns ca-certificates git openssh-client \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
-
-COPY --from=runner /usr/local/bin/gitea-runner /usr/local/bin/gitea-runner
-
-RUN mkdir -p /etc/containers \
- && printf 'unqualified-search-registries = ["docker.io"]\n' \
-        > /etc/containers/registries.conf
-
-# Non-root user + subordinate UID/GID ranges for nested user namespaces. The
-# range must live inside the subcontainer's userns (0..65535) and must not
-# overlap the user's own UID (1000) — so start at 1001.
-RUN useradd --create-home --uid 1000 --shell /bin/bash app \
- && echo 'app:1001:64535' > /etc/subuid \
- && echo 'app:1001:64535' > /etc/subgid
-
-COPY assets/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
+ARG BINFMT_IMAGE
+COPY node_modules/forgejo-runner-startos/runtime/assets/install-runtime.sh /usr/local/share/ci-runner/install-runtime.sh
+RUN sh /usr/local/share/ci-runner/install-runtime.sh
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-client && rm -rf /var/lib/apt/lists/*
+COPY node_modules/forgejo-runner-startos/runtime/assets/ /usr/local/share/ci-runner/
+COPY --from=runner /bin/gitea-runner /usr/local/bin/gitea-runner
+COPY --from=binfmt /usr/bin/ /usr/bin/
+RUN printf '%s\n' "$BINFMT_IMAGE" > /usr/local/share/binfmt-image
+COPY --chmod=755 assets/entrypoint.sh /usr/local/bin/entrypoint.sh
 USER app
 WORKDIR /home/app

@@ -1,7 +1,13 @@
 .git
 .gitmodules
-node_modules
+node_modules/*
+!node_modules/forgejo-runner-startos
+node_modules/forgejo-runner-startos/*
+!node_modules/forgejo-runner-startos/runtime
 javascript
 ncc-cache
 docker-images
 *.s9pk
+**/.git
+**/__pycache__
+**/*.pyc

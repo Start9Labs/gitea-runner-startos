@@ -1,0 +1,274 @@
+Subject: [PATCH] Install CA-only system and Node trust before actions
+
+Retire when upstream supports public root installation before actions with no private-key propagation.
+
+diff --git a/act/runner/run_context.go b/act/runner/run_context.go
+index 37dd629d..0e448e02 100644
+--- a/act/runner/run_context.go
++++ b/act/runner/run_context.go
+@@ -499,6 +499,7 @@ func (rc *RunContext) startKubernetesPod() common.Executor {
+ 			rc.JobContainer.Create(nil, nil),
+ 			rc.startServiceContainers(),
+ 			rc.JobContainer.Start(false),
++			rc.installTrustedRootCA(),
+ 			func(ctx context.Context) error { rc.setRunnerContextEnv(ctx); return nil },
+ 			rc.captureJobContainerInfo(),
+ 			rc.copyWorkflowFiles(),
+@@ -620,6 +621,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
+ 			func(ctx context.Context) error { return rc.createJobVolumes(ctx, containerInput.Mounts) },
+ 			rc.JobContainer.Create(rc.Config.ContainerCapAdd, rc.Config.ContainerCapDrop),
+ 			rc.JobContainer.Start(false),
++			rc.installTrustedRootCA(),
+ 			rc.captureJobContainerInfo(),
+ 			rc.copyWorkflowFiles(),
+ 			rc.waitForServiceContainers(),
+diff --git a/act/runner/runner.go b/act/runner/runner.go
+index ec2cb9bc..13a16564 100644
+--- a/act/runner/runner.go
++++ b/act/runner/runner.go
+@@ -29,6 +29,7 @@ import (
+ type Config struct {
+ 	Actor                         string                                        // the user that triggered the event
+ 	Workdir                       string                                        // path to working directory
++	TrustedRootCA                 string                                        // CA-only PEM installed before job actions
+ 	ActionCacheDir                string                                        // path used for caching action contents
+ 	ActionOfflineMode             bool                                          // when offline, use cached action contents
+ 	ActionCloneDepth              int                                           // limit history when cloning an action repo, 0 clones every branch in full
+diff --git a/act/runner/trusted_root_ca.go b/act/runner/trusted_root_ca.go
+new file mode 100644
+index 00000000..63b310d5
+--- /dev/null
++++ b/act/runner/trusted_root_ca.go
+@@ -0,0 +1,83 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package runner
++
++import (
++	"bytes"
++	"context"
++	"crypto/x509"
++	"encoding/pem"
++	"errors"
++	"fmt"
++	"os"
++
++	"gitea.com/gitea/runner/act/common"
++	"gitea.com/gitea/runner/act/container"
++)
++
++const (
++	rootCAFilename  = "startos-root-ca.crt"
++	rootCASystemDir = "/usr/local/share/ca-certificates"
++	rootCASharedDir = "/var/run/act/trust"
++)
++
++// TrustedRootCAPath is shared by job containers and Docker actions.
++const TrustedRootCAPath = rootCASharedDir + "/" + rootCAFilename
++
++// LoadTrustedRootCA accepts a nonempty CA-only PEM bundle, or an unset path.
++func LoadTrustedRootCA(path string) (string, error) {
++	if path == "" {
++		return "", nil
++	}
++	contents, err := os.ReadFile(path)
++	if err != nil {
++		return "", err
++	}
++	remaining := bytes.TrimSpace(contents)
++	if len(remaining) == 0 {
++		return "", errors.New("empty trusted CA bundle")
++	}
++	for len(remaining) > 0 {
++		const begin = "-----BEGIN CERTIFICATE-----"
++		const end = "-----END CERTIFICATE-----"
++		boundary := bytes.Index(remaining, []byte(end))
++		if !bytes.HasPrefix(remaining, []byte(begin)) || boundary < 0 {
++			return "", errors.New("trusted CA bundle contains non-certificate data")
++		}
++		boundary += len(end)
++		block, extra := pem.Decode(remaining[:boundary])
++		if block == nil || block.Type != "CERTIFICATE" || len(block.Headers) != 0 || len(bytes.TrimSpace(extra)) != 0 || bytes.Count(remaining[:boundary], []byte("-----BEGIN")) != 1 {
++			return "", errors.New("malformed trusted CA certificate")
++		}
++		certificate, err := x509.ParseCertificate(block.Bytes)
++		if err != nil || !certificate.IsCA || !certificate.BasicConstraintsValid {
++			return "", errors.New("trusted certificate is not a CA")
++		}
++		remaining = bytes.TrimSpace(remaining[boundary:])
++	}
++	return string(contents), nil
++}
++
++func (rc *RunContext) installTrustedRootCA() common.Executor {
++	if rc.Config.TrustedRootCA == "" {
++		return func(context.Context) error { return nil }
++	}
++	certificate := func() *container.FileEntry {
++		return &container.FileEntry{Name: rootCAFilename, Mode: 0o644, Body: rc.Config.TrustedRootCA}
++	}
++	return common.NewPipelineExecutor(
++		rc.JobContainer.Exec([]string{"sh", "-ec", fmt.Sprintf("mkdir -p %q %q", rootCASystemDir, rootCASharedDir)}, nil, "0", "/"),
++		rc.JobContainer.Copy(rootCASystemDir+"/", certificate()),
++		rc.JobContainer.Copy(rootCASharedDir+"/", certificate()),
++		rc.JobContainer.Exec([]string{"sh", "-ec", fmt.Sprintf(`if command -v update-ca-certificates >/dev/null 2>&1; then
++  update-ca-certificates
++elif command -v update-ca-trust >/dev/null 2>&1; then
++  mkdir -p /etc/pki/ca-trust/source/anchors
++  cp %q /etc/pki/ca-trust/source/anchors/%s
++  update-ca-trust extract
++else
++  echo 'System CA updater unavailable; Node uses the extra public CA' >&2
++fi`, rootCASystemDir+"/"+rootCAFilename, rootCAFilename)}, nil, "0", "/"),
++	)
++}
+diff --git a/act/runner/trusted_root_ca_test.go b/act/runner/trusted_root_ca_test.go
+new file mode 100644
+index 00000000..ae72dc04
+--- /dev/null
++++ b/act/runner/trusted_root_ca_test.go
+@@ -0,0 +1,117 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package runner
++
++import (
++	"context"
++	"crypto/ecdsa"
++	"crypto/elliptic"
++	"crypto/rand"
++	"crypto/x509"
++	"encoding/pem"
++	"errors"
++	"math/big"
++	"os"
++	"path/filepath"
++	"testing"
++	"time"
++
++	"gitea.com/gitea/runner/act/common"
++	"gitea.com/gitea/runner/act/container"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestTrustedRootCAValidation(t *testing.T) {
++	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++	require.NoError(t, err)
++	certificate := func(ca bool) []byte {
++		template := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), IsCA: ca, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature}
++		der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
++		require.NoError(t, err)
++		return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
++	}
++	ca := string(certificate(true))
++	privateDER, err := x509.MarshalECPrivateKey(key)
++	require.NoError(t, err)
++	private := string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privateDER}))
++	for _, test := range []struct {
++		name, data string
++		accepted   bool
++	}{
++		{"CA", ca, true},
++		{"bundle", ca + ca, true},
++		{"leaf", string(certificate(false)), false},
++		{"private", private, false},
++		{"mixed", ca + private, false},
++		{"empty", "", false},
++		{"garbage", ca + "garbage", false},
++		{"malformed-block", "-----BEGIN CERTIFICATE-----\ninvalid\n-----END CERTIFICATE-----\n" + ca, false},
++		{"malformed-prefix", "-----BEGIN CERTIFICATE-----\ninvalid\n" + ca, false},
++	} {
++		t.Run(test.name, func(t *testing.T) {
++			path := filepath.Join(t.TempDir(), "ca.pem")
++			require.NoError(t, os.WriteFile(path, []byte(test.data), 0o600))
++			actual, err := LoadTrustedRootCA(path)
++			if test.accepted {
++				require.NoError(t, err)
++				require.Equal(t, test.data, actual)
++			} else {
++				require.Error(t, err)
++				require.Empty(t, actual)
++			}
++		})
++	}
++	value, err := LoadTrustedRootCA("")
++	require.NoError(t, err)
++	require.Empty(t, value)
++	_, err = LoadTrustedRootCA(filepath.Join(t.TempDir(), "missing"))
++	require.Error(t, err)
++}
++
++type caInstallContainer struct {
++	containerMock
++	operations []string
++	users      []string
++	files      []*container.FileEntry
++	failure    error
++}
++
++func (c *caInstallContainer) Exec(command []string, _ map[string]string, user, _ string) common.Executor {
++	return func(context.Context) error {
++		c.operations = append(c.operations, command[2])
++		c.users = append(c.users, user)
++		return c.failure
++	}
++}
++
++func (c *caInstallContainer) Copy(destination string, files ...*container.FileEntry) common.Executor {
++	return func(context.Context) error {
++		c.operations = append(c.operations, destination)
++		c.files = append(c.files, files...)
++		return nil
++	}
++}
++
++func TestTrustedRootCAInstallation(t *testing.T) {
++	rc := &RunContext{Config: &Config{}}
++	require.NoError(t, rc.installTrustedRootCA()(t.Context()))
++	job := &caInstallContainer{}
++	rc.JobContainer = job
++	rc.Config.TrustedRootCA = "public CA fixture"
++	require.NoError(t, common.NewPipelineExecutor(rc.installTrustedRootCA(), func(context.Context) error { job.operations = append(job.operations, "first action"); return nil })(t.Context()))
++	require.Len(t, job.operations, 5)
++	require.Contains(t, job.operations[0], "mkdir")
++	require.Equal(t, "/usr/local/share/ca-certificates/", job.operations[1])
++	require.Equal(t, "/var/run/act/trust/", job.operations[2])
++	require.Contains(t, job.operations[3], "update-ca-certificates")
++	require.Equal(t, "first action", job.operations[4])
++	require.Equal(t, []string{"0", "0"}, job.users)
++	for _, file := range job.files {
++		require.Equal(t, "public CA fixture", file.Body)
++		require.EqualValues(t, 0o644, file.Mode)
++	}
++	job.failure = errors.New("cannot install")
++	require.ErrorIs(t, rc.installTrustedRootCA()(t.Context()), job.failure)
++}
+diff --git a/internal/app/run/runner.go b/internal/app/run/runner.go
+index 28287f49..b08b1a36 100644
+--- a/internal/app/run/runner.go
++++ b/internal/app/run/runner.go
+@@ -492,6 +492,13 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
+ 
+ 	taskContext := task.Context.Fields
+ 	envs := r.cloneEnvs()
++	trustedRootCA, err := runner.LoadTrustedRootCA(os.Getenv("RUNNER_ROOT_CA"))
++	if err != nil {
++		return fmt.Errorf("load public job CA: %w", err)
++	}
++	if trustedRootCA != "" {
++		envs["NODE_EXTRA_CA_CERTS"] = runner.TrustedRootCAPath
++	}
+ 
+ 	// act asks for the platform once per step, so resolve the fallback at most once per task.
+ 	fallbackPlatform := sync.OnceValue(func() string { return r.fallbackPlatform(ctx) })
+@@ -606,6 +613,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
+ 
+ 
+ 	runnerConfig := &runner.Config{
++		TrustedRootCA: trustedRootCA,
+ 		// On Linux, Workdir will be like "/<parent_directory>/<owner>/<repo>"
+ 		// On Windows, Workdir will be like "\<parent_directory>\<owner>\<repo>"
+ 		Workdir:           workdir,

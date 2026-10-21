@@ -1,0 +1,186 @@
+Subject: [PATCH] Provision the host execution environment after assignment
+
+Retire when upstream offers a reporter-live host provisioning hook without idle Docker access.
+
+diff --git a/docs/host-provisioning.md b/docs/host-provisioning.md
+new file mode 100644
+index 00000000..dd766294
+--- /dev/null
++++ b/docs/host-provisioning.md
+@@ -0,0 +1,7 @@
++# Host provisioning before an assigned task
++
++`runner.before_job` is an operator-controlled argv list. The runner executes it on the controller host after assignment, with the task reporter active, before platform, cache or execution-environment discovery. A nonzero exit fails the assigned task; cancellation interrupts the command. Its output goes through the task reporter and secret masker.
++
++With this hook configured, daemon startup defers Docker readiness checks and idle maintenance. Endpoint resolution, `DOCKER_HOST` configuration and remote-socket mount suppression remain active. The hook must make the configured Docker endpoint available before it returns. Default behavior is unchanged without the hook.
++
++Never derive this command from workflow contents. Registration and Docker client private keys belong to the controller, not the guest seed or a workflow bind mount. An external VM supervisor must stop the guest and release its resources on success, failure and cancellation; the successful-task-only post-task script is not sufficient for that cleanup.
+diff --git a/internal/app/cmd/daemon.go b/internal/app/cmd/daemon.go
+index 937435ba..b6ff0afb 100644
+--- a/internal/app/cmd/daemon.go
++++ b/internal/app/cmd/daemon.go
+@@ -112,8 +112,9 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
+ 		}
+ 
+ 		if ls.RequireDocker() || cfg.Container.RequireDocker {
++			validateDocker := len(cfg.Runner.BeforeJob) == 0
+ 			// Wait for dockerd be ready
+-			if timeout := cfg.Container.DockerTimeout; timeout > 0 {
++			if timeout := cfg.Container.DockerTimeout; timeout > 0 && validateDocker {
+ 				tctx, cancel := context.WithTimeout(ctx, timeout)
+ 				defer cancel()
+ 				keepRunning := true
+@@ -143,12 +144,16 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
+ 			if err != nil {
+ 				return err
+ 			}
+-			if err := envcheck.CheckIfDockerRunning(ctx, dockerSocketPath); err != nil {
+-				return err
++			if validateDocker {
++				if err := envcheck.CheckIfDockerRunning(ctx, dockerSocketPath); err != nil {
++					return err
++				}
+ 			}
+-			// if dockerSocketPath passes the check, override DOCKER_HOST with dockerSocketPath
++			// Remote endpoints remain in DOCKER_HOST after mount normalization.
+ 			os.Setenv("DOCKER_HOST", dockerSocketPath)
+-			run.WarnIfDaemonHasNoProxy(ctx)
++			if validateDocker {
++				run.WarnIfDaemonHasNoProxy(ctx)
++			}
+ 			// empty cfg.Container.DockerHost means runner need to find an available docker host automatically
+ 			// and assign the path to cfg.Container.DockerHost
+ 			if cfg.Container.DockerHost == "" {
+diff --git a/internal/app/run/before_job.go b/internal/app/run/before_job.go
+new file mode 100644
+index 00000000..3d4a8123
+--- /dev/null
++++ b/internal/app/run/before_job.go
+@@ -0,0 +1,22 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package run
++
++import (
++	"context"
++	"io"
++	"os/exec"
++	"time"
++)
++
++func runBeforeJob(ctx context.Context, command []string, output io.Writer) error {
++	if len(command) == 0 {
++		return nil
++	}
++	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
++	cmd.Stdout = output
++	cmd.Stderr = output
++	cmd.WaitDelay = 5 * time.Second
++	return cmd.Run()
++}
+diff --git a/internal/app/run/before_job_test.go b/internal/app/run/before_job_test.go
+new file mode 100644
+index 00000000..0d530cce
+--- /dev/null
++++ b/internal/app/run/before_job_test.go
+@@ -0,0 +1,40 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package run
++
++import (
++	"bytes"
++	"context"
++	"os"
++	"path/filepath"
++	"testing"
++	"time"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestHostProvisioning(t *testing.T) {
++	t.Run("absent", func(t *testing.T) {
++		require.NoError(t, runBeforeJob(t.Context(), nil, &bytes.Buffer{}))
++	})
++	t.Run("completed before execution", func(t *testing.T) {
++		marker := filepath.Join(t.TempDir(), "ready")
++		var output bytes.Buffer
++		require.NoError(t, runBeforeJob(t.Context(), []string{"sh", "-ec", "printf 'line one\\nline two'; printf ready > \"$1\"", "hook", marker}, &output))
++		data, err := os.ReadFile(marker)
++		require.NoError(t, err)
++		require.Equal(t, "ready", string(data))
++		require.Equal(t, "line one\nline two", output.String())
++	})
++	t.Run("failure", func(t *testing.T) {
++		require.Error(t, runBeforeJob(t.Context(), []string{"sh", "-c", "exit 7"}, &bytes.Buffer{}))
++	})
++	t.Run("cancelled", func(t *testing.T) {
++		ctx, cancel := context.WithCancel(t.Context())
++		cancel()
++		start := time.Now()
++		require.Error(t, runBeforeJob(ctx, []string{"sleep", "60"}, &bytes.Buffer{}))
++		require.Less(t, time.Since(start), time.Second)
++	})
++}
+diff --git a/internal/app/run/runner.go b/internal/app/run/runner.go
+index 85a0a697..ce7fd1f1 100644
+--- a/internal/app/run/runner.go
++++ b/internal/app/run/runner.go
+@@ -162,6 +162,9 @@ var removeOrphanKubernetesResources = container.RemoveOrphanKubernetesResources
+ // throttles invocations to runner.idle_cleanup_interval so the impact on
+ // poll cadence is bounded even when the workdir root is large.
+ func (r *Runner) OnIdle(ctx context.Context) {
++	if len(r.cfg.Runner.BeforeJob) > 0 {
++		return
++	}
+ 	if !r.shouldRunIdleCleanup() {
+ 		return
+ 	}
+@@ -474,6 +477,19 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
+ 	reporter.ResetSteps(job.Steps)
+ 	telemetry.SetJobName(ctx, cmp.Or(job.Name, jobID))
+ 
++	if len(r.cfg.Runner.BeforeJob) > 0 {
++		reporter.Logf("Preparing job execution environment")
++		output := common.NewLineWriter(func(line string) bool {
++			reporter.Logf("%s", strings.TrimRight(line, "\r\n"))
++			return true
++		})
++		err := runBeforeJob(ctx, r.cfg.Runner.BeforeJob, output)
++		common.FlushWriter(output)
++		if err != nil {
++			return fmt.Errorf("prepare job execution environment: %w", err)
++		}
++	}
++
+ 	taskContext := task.Context.Fields
+ 	envs := r.cloneEnvs()
+ 
+diff --git a/internal/pkg/config/config.example.yaml b/internal/pkg/config/config.example.yaml
+index 5a90db19..099b1d77 100644
+--- a/internal/pkg/config/config.example.yaml
++++ b/internal/pkg/config/config.example.yaml
+@@ -18,6 +18,8 @@ log:
+   #  max_size: 1GB
+ 
+ runner:
++  # Trusted host argv before execution-environment access; see docs/host-provisioning.md.
++  #before_job: []
+   # Where to store the registration result.
+   #file: .runner
+   # Execute how many tasks concurrently at the same time.
+diff --git a/internal/pkg/config/config.go b/internal/pkg/config/config.go
+index c6a8f06d..ae57fc8d 100644
+--- a/internal/pkg/config/config.go
++++ b/internal/pkg/config/config.go
+@@ -58,6 +58,7 @@ type LogJob struct {
+ 
+ // Runner represents the configuration for the runner.
+ type Runner struct {
++	BeforeJob             []string          `yaml:"before_job"`               // Trusted host command after assignment, before execution-environment access.
+ 	File                  string            `yaml:"file"`                     // File specifies the file path for the runner.
+ 	Capacity              int               `yaml:"capacity"`                 // Capacity specifies the capacity of the runner.
+ 	Envs                  map[string]string `yaml:"envs"`                     // Envs stores environment variables for the runner.

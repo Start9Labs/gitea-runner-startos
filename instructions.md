@@ -2,54 +2,45 @@
 
 ## Documentation
 
-- [Gitea Actions documentation](https://docs.gitea.com/usage/actions) — upstream reference for workflow syntax, runners, and the Actions admin settings.
-
-## What you get on StartOS
-
-A CI/CD runner that executes Gitea Actions workflows for the **Gitea on this device**. Each job runs in its own isolated, rootless container, and jobs that target another CPU architecture (`arm64`, `riscv64`) run under emulation automatically. The runner has no interface of its own — you see it and its job logs inside Gitea, in its Runners list and the Actions tab.
+- [Gitea Actions documentation](https://docs.gitea.com/usage/actions) — workflows, runners and Actions administration.
 
 ## Getting set up
 
-This runner serves the Gitea on the same device, so install and start **Gitea** first, with Gitea Actions enabled (the default). A critical **Configure** task keeps an unconfigured runner stopped until you save a registration token.
+Your runner serves **Gitea on this device**. Have Gitea running with Actions enabled before configuring the runner.
 
-1. In Gitea, create a runner registration token under **Site / Organization / Repository Settings → Actions → Runners → Create new Runner**, and copy it.
-2. Open the **Configure** task here and paste the token. Adjust the runner name, labels, and concurrent-jobs count if you like — the default `ubuntu-latest` label runs jobs in a standard Ubuntu image.
-3. Start (or restart) the service. It registers with Gitea and begins picking up jobs; it should appear as **Online** in Gitea's Runners.
+1. In Gitea, create a runner registration token under **Site / Organization / Repository Settings → Actions → Runners → Create new Runner**.
+2. Open **Configure** here. Paste the token and choose a runner name, labels and concurrent-job limit. The default label is `ubuntu-latest`.
+3. Leave **Virtualization** enabled when available for a separate guest kernel per assignment. Without accessible KVM, new configurations default to containers sharing the StartOS kernel. Use container mode only for trusted workflows.
+4. Start the service. First-time VM preparation can take several minutes; watch **VM Image Preparation**. When ready, your runner appears online in Gitea.
 
-> Running **Configure** re-registers the runner on the next start, so supply a fresh token each time (registration tokens are single-use).
+For later execution-setting changes, **leave Registration Token blank** to keep your identity. Saving Configure interrupts active jobs and restarts the runner. Supply a fresh token only to create or replace registration, including a name change. A failed replacement keeps the previous identity.
 
-If Gitea is reinstalled, it no longer knows this runner: the **Runner** health check reports that it is not registered. Run **Configure** with a fresh token, then restart. The same applies if registration fails with an invalid or spent token.
+If Gitea no longer recognizes your runner, use Configure with a fresh token. Restarting with a spent token cannot repair registration. A restored identity does not require the old registration token to remain saved.
 
-## Using the Gitea Runner
+## Running workflows
 
-Once it is online, Gitea dispatches workflow jobs to it automatically — there is nothing to drive here day to day. Follow progress and read job logs in Gitea's **Actions** tab; here, the **Runner** health check shows whether it is up, and the service logs show registration and startup. When a task starts, the service logs include task, job and run identifiers to help match it to a workflow run.
+Follow runs, logs and artifacts in Gitea's **Actions** tab. Here, an idle virtualized slot reports success without running a VM. Loading means an assignment is waiting for memory, preparing its VM, running or cleaning up. A slot can remain loading while another job releases memory; raising concurrency does not create more RAM.
 
-### Labels and architecture
+Reusable-workflow jobs and matrices run sequentially within each assignment. Separate assignments can still overlap up to your configured limit. Guest disks are bounded; if a build fills its disk, reduce concurrent jobs to allow a larger per-guest budget, or reduce the build's storage use.
 
-Each job must have a nonempty `runs-on:` matching the runner's labels, unless it calls a reusable workflow. Add a foreign-architecture label in **Configure** to also serve emulated jobs for that architecture — they work, but are much slower than native, so prefer a separate runner on native hardware for each architecture you build for regularly.
+VM job images are pulled into a fresh guest for each assignment, so image downloads can take time even after the guest base is prepared. Container mode can retain engine image layers between assignments.
 
-### First run
+### Labels and emulation
 
-The first job on each label pulls its container image before anything else runs — the default `ubuntu-latest` image is about 1 GB, so **Set up job** can sit for a minute or two showing only a spinner. The image is cached afterward; later runs start in seconds.
+Use unique labels in `name:docker://image` format; host-execution labels are not supported. A job's `runs-on` must match a runner label unless it calls a reusable workflow.
 
-### Checking out your repository
+Enable **Enable Emulation** in Configure to add the other CPU architecture's label: `linux-arm64` on an x86_64 runner, or `linux-amd64` on an aarch64 runner. Point the corresponding workflow jobs at that label. Emulation is slower than native execution; prefer a native runner per architecture for regular builds.
 
-To check out the repository a workflow belongs to, use the runner's built-in action. It needs neither an action download nor Node, and uses the job's token by default. Your job image must include Git; it must also be able to reach Gitea and trust its certificate if you use HTTPS. SSH checkouts additionally need an SSH client, and LFS checkouts need Git LFS:
+### Checkout and HTTPS
+
+The built-in checkout action can use your job's token without downloading another action:
 
 ```yaml
 - uses: builtin:checkout
 ```
 
-Checkout removes untracked and ignored files by default. Set `with: { clean: false }` if you need to keep them. It supports SSH keys, submodules, LFS, sparse checkout and partial clones, and persists credentials for later fetches and pushes unless you set `persist-credentials: false`. A tag-triggered checkout fails if the tag moved after the workflow started.
+Your job image needs Git; SSH checkout also needs an SSH client. Ordinary jobs receive public StartOS certificate trust and routing for Gitea's local hostname. If you use a custom Docker action image, provide its required certificate trust and DNS configuration in that image or workflow. Do not disable certificate verification to work around a failing connection.
 
-The standard checkout action also works and authenticates with the job's token:
+### Choosing container mode
 
-```yaml
-- uses: actions/checkout@v4
-```
-
-To clone in a plain `run:` step instead, authenticate with the job's token; the in-job clone URL is anonymous by default and fails on private repositories:
-
-```yaml
-- run: git clone "http://ci:${{ github.token }}@${GITHUB_SERVER_URL#*://}/${GITHUB_REPOSITORY}.git" .
-```
+Disabling Virtualization reduces startup cost but removes the separate guest-kernel boundary: privileged job containers share the StartOS kernel. A VM boot or provisioning failure does not switch an assignment to container mode. If KVM becomes unavailable while Virtualization is saved as enabled, the runner stops serving jobs and raises a critical Configure task. Restore KVM access and save Configure with Virtualization on, or save it with Virtualization off to explicitly permit container mode. Registration is preserved. Inspect the failed slot's logs before retrying.

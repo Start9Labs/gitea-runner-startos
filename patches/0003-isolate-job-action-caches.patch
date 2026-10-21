@@ -1,0 +1,104 @@
+Subject: [PATCH] Give each assigned task a private action-source cache
+
+Retire when upstream isolates task source trees without reusing abandoned Git index locks.
+
+diff --git a/internal/app/run/job_action_cache.go b/internal/app/run/job_action_cache.go
+new file mode 100644
+index 00000000..7ab72b9e
+--- /dev/null
++++ b/internal/app/run/job_action_cache.go
+@@ -0,0 +1,15 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package run
++
++import "os"
++
++func newJobActionCache(parent string) (string, error) {
++	if parent != "" {
++		if err := os.MkdirAll(parent, 0o700); err != nil {
++			return "", err
++		}
++	}
++	return os.MkdirTemp(parent, "gitea-runner-actions-")
++}
+diff --git a/internal/app/run/job_action_cache_test.go b/internal/app/run/job_action_cache_test.go
+new file mode 100644
+index 00000000..fff9e092
+--- /dev/null
++++ b/internal/app/run/job_action_cache_test.go
+@@ -0,0 +1,44 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package run
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestJobActionCacheIsolation(t *testing.T) {
++	defaultCache, err := newJobActionCache("")
++	require.NoError(t, err)
++	defer os.RemoveAll(defaultCache)
++	require.DirExists(t, defaultCache)
++	parent := t.TempDir()
++	stale := filepath.Join(parent, "old-action", ".git", "index.lock")
++	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0o755))
++	require.NoError(t, os.WriteFile(stale, []byte("another task"), 0o600))
++	first, err := newJobActionCache(parent)
++	require.NoError(t, err)
++	second, err := newJobActionCache(parent)
++	require.NoError(t, err)
++	require.NotEqual(t, first, second)
++	for _, directory := range []string{first, second} {
++		entries, err := os.ReadDir(directory)
++		require.NoError(t, err)
++		require.Empty(t, entries)
++		info, err := os.Stat(directory)
++		require.NoError(t, err)
++		if runtime.GOOS != "windows" {
++			require.Equal(t, os.FileMode(0o700), info.Mode().Perm())
++		}
++	}
++	require.NoError(t, os.RemoveAll(first))
++	require.DirExists(t, second)
++	contents, err := os.ReadFile(stale)
++	require.NoError(t, err)
++	require.Equal(t, "another task", string(contents))
++}
+diff --git a/internal/app/run/runner.go b/internal/app/run/runner.go
+index ce7fd1f1..28287f49 100644
+--- a/internal/app/run/runner.go
++++ b/internal/app/run/runner.go
+@@ -594,12 +594,23 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
+ 
+ 	r.setResultsService(envs, resultsURL)
+ 
++	actionCacheDir, err := newJobActionCache(filepath.FromSlash(r.cfg.Host.WorkdirParent))
++	if err != nil {
++		return fmt.Errorf("create private action cache: %w", err)
++	}
++	defer func() {
++		if err := os.RemoveAll(actionCacheDir); err != nil {
++			common.Logger(ctx).WithError(err).Warnf("remove private action cache")
++		}
++	}()
++
++
+ 	runnerConfig := &runner.Config{
+ 		// On Linux, Workdir will be like "/<parent_directory>/<owner>/<repo>"
+ 		// On Windows, Workdir will be like "\<parent_directory>\<owner>\<repo>"
+ 		Workdir:           workdir,
+ 		BindWorkdir:       r.cfg.Container.BindWorkdir,
+-		ActionCacheDir:    filepath.FromSlash(r.cfg.Host.WorkdirParent),
++		ActionCacheDir:    actionCacheDir,
+ 		AllocatePTY:       r.cfg.Runner.AllocatePTY,
+ 		ActionOfflineMode: r.cfg.Cache.OfflineMode,
+ 		ActionCloneDepth:  actionCloneDepth,
