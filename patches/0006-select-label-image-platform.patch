@@ -1,0 +1,334 @@
+Subject: [PATCH] Select job and action image architecture from Docker labels
+
+Retire when upstream selects Docker image platforms per expanded job and carries them into reusable workflows.
+
+diff --git a/act/runner/action.go b/act/runner/action.go
+index bf4159f8..7d3c4a45 100644
+--- a/act/runner/action.go
++++ b/act/runner/action.go
+@@ -323,7 +323,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+ 			return err
+ 		}
+ 
+-		correctArchExists, err := ContainerImageExistsLocally(ctx, image, rc.Config.ContainerArchitecture)
++		correctArchExists, err := ContainerImageExistsLocally(ctx, image, rc.dockerImagePlatform(ctx))
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -339,7 +339,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+ 		}
+ 
+ 		if !correctArchExists || rc.Config.ForceRebuild {
+-			logger.Debugf("image '%s' for architecture '%s' will be built from context '%s", image, rc.Config.ContainerArchitecture, contextDir)
++			logger.Debugf("image '%s' for architecture '%s' will be built from context '%s", image, rc.dockerImagePlatform(ctx), contextDir)
+ 			var buildContext io.ReadCloser
+ 			if localAction {
+ 				buildContext, err = rc.JobContainer.GetContainerArchive(ctx, contextDir+"/.")
+@@ -353,7 +353,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+ 				Dockerfile:   fileName,
+ 				ImageTag:     image,
+ 				BuildContext: buildContext,
+-				Platform:     rc.Config.ContainerArchitecture,
++				Platform:     rc.dockerImagePlatform(ctx),
+ 				BuildArgs:    rc.proxyBuildArgs(),
+ 			})
+ 			if buildContext == nil {
+@@ -369,7 +369,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+ 				}
+ 			}
+ 		} else {
+-			logger.Debugf("image '%s' for architecture '%s' already exists", image, rc.Config.ContainerArchitecture)
++			logger.Debugf("image '%s' for architecture '%s' already exists", image, rc.dockerImagePlatform(ctx))
+ 		}
+ 	}
+ 	cmd, err := shellquote.Split(step.getStepModel().With["args"])
+@@ -487,7 +487,7 @@ func newStepContainer(ctx context.Context, step step, image string, cmd, entrypo
+ 		Stderr:        logWriter,
+ 		Privileged:    rc.Config.Privileged,
+ 		UsernsMode:    rc.Config.UsernsMode,
+-		Platform:      rc.Config.ContainerArchitecture,
++		Platform:      rc.dockerImagePlatform(ctx),
+ 		RunnerOptions: runnerOptions,
+ 		AutoRemove:    true,
+ 		ValidVolumes:  rc.validVolumes(),
+diff --git a/act/runner/image_platform_test.go b/act/runner/image_platform_test.go
+new file mode 100644
+index 00000000..b3184f19
+--- /dev/null
++++ b/act/runner/image_platform_test.go
+@@ -0,0 +1,37 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package runner
++
++import (
++	"testing"
++
++	"gitea.com/gitea/runner/internal/pkg/labels"
++
++	"gitea.dev/actionslib/pkg/model"
++	"github.com/stretchr/testify/require"
++	"go.yaml.in/yaml/v4"
++)
++
++func TestDockerImagePlatformSelection(t *testing.T) {
++	label, err := labels.Parse("linux-arm64:docker://example/image:tag?platform=linux/arm64")
++	require.NoError(t, err)
++	configured := labels.Labels{label}
++	var runsOn, services yaml.Node
++	require.NoError(t, runsOn.Encode([]string{"linux-${{ matrix.arch }}"}))
++	require.NoError(t, services.Encode(map[string]any{"database": map[string]any{"image": "example/database:tag"}}))
++	rc := &RunContext{
++		Config: &Config{Workdir: t.TempDir(), ContainerArchitecture: "linux/amd64", DockerImagePlatformPicker: configured.PickDockerImagePlatform},
++		Run:    &model.Run{JobID: "build", Workflow: &model.Workflow{Jobs: map[string]*model.Job{"build": {RawRunsOn: runsOn, RawServices: services}}}},
++		Matrix: map[string]any{"arch": "arm64"},
++	}
++	rc.ExprEval = rc.NewExpressionEvaluator(t.Context())
++	require.Equal(t, "linux/arm64", rc.dockerImagePlatform(t.Context()))
++	inputs, err := rc.jobServices(t.Context(), "network")
++	require.NoError(t, err)
++	require.Equal(t, "linux/arm64", inputs["database"].Platform)
++	rc.Matrix["arch"] = "unknown"
++	require.Equal(t, "linux/amd64", rc.dockerImagePlatform(t.Context()))
++	rc.Config.DockerImagePlatformPicker = nil
++	require.Equal(t, "linux/amd64", rc.dockerImagePlatform(t.Context()))
++}
+diff --git a/act/runner/run_context.go b/act/runner/run_context.go
+index 0e448e02..f204fb9c 100644
+--- a/act/runner/run_context.go
++++ b/act/runner/run_context.go
+@@ -587,7 +587,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
+ 			Stderr:          logWriter,
+ 			Privileged:      rc.Config.Privileged,
+ 			UsernsMode:      rc.Config.UsernsMode,
+-			Platform:        rc.Config.ContainerArchitecture,
++			Platform:        rc.dockerImagePlatform(ctx),
+ 			RunnerOptions:   rc.Config.ContainerOptions,
+ 			WorkflowOptions: rc.containerSpec.Options,
+ 			AutoRemove:      true,
+@@ -689,7 +689,7 @@ func (rc *RunContext) jobServices(ctx context.Context, networkName string) (map[
+ 			Stderr:          serviceLog,
+ 			Privileged:      rc.Config.Privileged,
+ 			UsernsMode:      rc.Config.UsernsMode,
+-			Platform:        rc.Config.ContainerArchitecture,
++			Platform:        rc.dockerImagePlatform(ctx),
+ 			AutoRemove:      false, // so a dead service's log survives, cleanupJobResources removes it
+ 			WorkflowOptions: spec.Options,
+ 			NetworkMode:     networkName,
+@@ -1252,6 +1252,15 @@ func (rc *RunContext) runsOnImage(ctx context.Context) (string, error) {
+ 	return "", nil
+ }
+ 
++func (rc *RunContext) dockerImagePlatform(ctx context.Context) string {
++	if pick := rc.Config.DockerImagePlatformPicker; pick != nil {
++		if platform := pick(rc.runsOnPlatformNames(ctx)); platform != "" {
++			return platform
++		}
++	}
++	return rc.Config.ContainerArchitecture
++}
++
+ func (rc *RunContext) runsOnPlatformNames(ctx context.Context) []string {
+ 	job := rc.Run.Job()
+ 
+diff --git a/act/runner/runner.go b/act/runner/runner.go
+index 7117d5a1..fb2aaaff 100644
+--- a/act/runner/runner.go
++++ b/act/runner/runner.go
+@@ -80,6 +80,7 @@ type Config struct {
+ 	// AppURL. It is never set for github.com or a GithubMirror, so the token stays on-instance.
+ 	DefaultActionInstanceIsSelfHosted bool
+ 	PlatformPicker                    func(labels []string) string
++	DockerImagePlatformPicker         func(labels []string) string // per-label OS/architecture overrides ContainerArchitecture
+ 	KubernetesPicker                  func(labels []string) container.KubernetesOptions
+ 	InstanceTransport                 http.RoundTripper
+ 	JobLoggerLevel                    *logging.Level // the level of job logger
+diff --git a/docs/assigned-task-isolation.md b/docs/assigned-task-isolation.md
+new file mode 100644
+index 00000000..49d3aa30
+--- /dev/null
++++ b/docs/assigned-task-isolation.md
+@@ -0,0 +1,11 @@
++# Assigned-task execution isolation
++
++The packaged daemon sets `act.Config.SerialJobs` for each assignment. Independent jobs and matrix entries expanded locally, including nested reusable workflows, share that assignment's serial execution policy. Separate assignments retain poller capacity. Library/exec callers leave this opt-in flag unset unless they request the same bound; no global semaphore spans reusable callers.
++
++Action downloads use a fresh private task directory, removed when execution returns. Shared Git clones and abandoned Git index locks are not reused or deleted. Remote metadata, generated fallback files and compatibility bundle edits use an opened repository root. Dockerfiles and build contexts must remain within that repository; `.dockerignore` must remain within its context. Local generated action files are copied through the container API instead of written to the controller.
++
++Docker labels may append `?platform=linux/arm64` or another Docker platform. The image reference excludes the query. Platform selection evaluates each expanded job's `runs-on`, applies to job/service/action containers and image builds, and survives reusable workflow configuration copies. Without a matching label platform, the existing runner-wide architecture remains the fallback. Installing binfmt alone does not select a platform.
++
++`RUNNER_ROOT_CA` optionally names an operator-owned public CA PEM bundle on the controller. Private keys, non-CA certificates, malformed PEM and extra data are rejected. The public certificate is copied into the job's system trust and shared action volume, and the supported system CA updater runs as user 0 before workflow actions. Node receives `NODE_EXTRA_CA_CERTS` for the shared public certificate. Custom Docker-action and service images still own their system trust stores.
++
++Runner-level Gitea client-certificate fields are not the Docker mTLS identity. Builtin checkout can copy those configured Gitea client keys into a job; a VM package must leave those fields unset. Docker client private keys and persistent registration remain controller-only.
+diff --git a/internal/app/run/runner.go b/internal/app/run/runner.go
+index 92137173..90994867 100644
+--- a/internal/app/run/runner.go
++++ b/internal/app/run/runner.go
+@@ -657,6 +657,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
+ 		DefaultActionInstance:             r.getDefaultActionsURL(task),
+ 		DefaultActionInstanceIsSelfHosted: r.isSelfHostedActionsURL(task),
+ 		PlatformPicker:                    platformPicker,
++		DockerImagePlatformPicker:         r.labels.PickDockerImagePlatform,
+ 		JobStartedHook:                    r.cfg.Runner.Hooks.JobStarted,
+ 		JobCompletedHook:                  r.cfg.Runner.Hooks.JobCompleted,
+ 		Vars:                              task.Vars,
+diff --git a/internal/pkg/labels/labels.go b/internal/pkg/labels/labels.go
+index a4910d9e..ccde9acb 100644
+--- a/internal/pkg/labels/labels.go
++++ b/internal/pkg/labels/labels.go
+@@ -5,6 +5,8 @@ package labels
+ 
+ import (
+ 	"errors"
++	"fmt"
++	"net/url"
+ 	"strings"
+ )
+ 
+@@ -12,15 +14,17 @@ const (
+ 	SchemeHost       = "host"
+ 	SchemeDocker     = "docker"
+ 	SchemeKubernetes = "kubernetes"
++	OptionPlatform   = "platform"
+ 
+ 	// SelfHostedPlatform is the platform marker act treats as "run on the host".
+ 	SelfHostedPlatform = "-self-hosted"
+ )
+ 
+ type Label struct {
+-	Name   string
+-	Schema string
+-	Arg    string
++	Name          string
++	Schema        string
++	Arg           string
++	ImagePlatform string // OS/architecture from the Docker label query.
+ 	// Opaque marks a label whose name contains a colon but no supported schema,
+ 	// like "pool:e57e18d4-...". It is kept verbatim and behaves like a host label.
+ 	Opaque bool
+@@ -52,6 +56,17 @@ func Parse(str string) (*Label, error) {
+ 			Opaque: true,
+ 		}, nil
+ 	}
++	if label.Schema == SchemeDocker {
++		image, query, found := strings.Cut(label.Arg, "?")
++		if found {
++			values, err := url.ParseQuery(query)
++			if err != nil || len(values) != 1 || len(values[OptionPlatform]) != 1 || values.Get(OptionPlatform) == "" {
++				return nil, fmt.Errorf("invalid Docker label options %q", query)
++			}
++			label.Arg = image
++			label.ImagePlatform = values.Get(OptionPlatform)
++		}
++	}
+ 	return label, nil
+ }
+ 
+@@ -68,28 +83,43 @@ func (l Labels) RequireDocker() bool {
+ 
+ // PickPlatform returns the platform of the first runs-on entry this runner has a label for, or "".
+ func (l Labels) PickPlatform(runsOn []string) string {
+-	platforms := make(map[string]string, len(l))
+-	for _, label := range l {
++	if label := l.pick(runsOn); label != nil {
+ 		switch label.Schema {
+ 		case SchemeDocker:
+-			// "//" will be ignored
+-			platforms[label.Name] = strings.TrimPrefix(label.Arg, "//")
++			return strings.TrimPrefix(label.Arg, "//")
+ 		case SchemeKubernetes:
+-			platforms[label.Name] = SchemeKubernetes + ":" + label.Arg
++			return SchemeKubernetes + ":" + label.Arg
+ 		case SchemeHost:
+-			platforms[label.Name] = SelfHostedPlatform
+-		default:
+-			continue
++			return SelfHostedPlatform
+ 		}
+ 	}
+-	for _, v := range runsOn {
+-		if v, ok := platforms[v]; ok {
+-			return v
+-		}
++	return ""
++}
++
++// PickDockerImagePlatform returns the matching Docker label's OS/architecture, or empty.
++func (l Labels) PickDockerImagePlatform(runsOn []string) string {
++	if label := l.pick(runsOn); label != nil && label.Schema == SchemeDocker {
++		return label.ImagePlatform
+ 	}
+ 	return ""
+ }
+ 
++func (l Labels) pick(runsOn []string) *Label {
++	byName := make(map[string]*Label, len(l))
++	for _, label := range l {
++		switch label.Schema {
++		case SchemeDocker, SchemeKubernetes, SchemeHost:
++			byName[label.Name] = label
++		}
++	}
++	for _, name := range runsOn {
++		if label, ok := byName[name]; ok {
++			return label
++		}
++	}
++	return nil
++}
++
+ func (l Labels) Names() []string {
+ 	names := make([]string, 0, len(l))
+ 	for _, label := range l {
+@@ -108,6 +138,9 @@ func (l Labels) ToStrings() []string {
+ 				lbl += ":" + label.Arg
+ 			}
+ 		}
++		if label.ImagePlatform != "" {
++			lbl += "?" + url.Values{OptionPlatform: {label.ImagePlatform}}.Encode()
++		}
+ 		ls = append(ls, lbl)
+ 	}
+ 	return ls
+diff --git a/internal/pkg/labels/platform_test.go b/internal/pkg/labels/platform_test.go
+new file mode 100644
+index 00000000..0aa1bd1f
+--- /dev/null
++++ b/internal/pkg/labels/platform_test.go
+@@ -0,0 +1,35 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package labels
++
++import (
++	"testing"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestDockerPlatformLabel(t *testing.T) {
++	arm, err := Parse("linux-arm64:docker://example/image:tag?platform=linux/arm64")
++	require.NoError(t, err)
++	native, err := Parse("native:docker://example/image:tag")
++	require.NoError(t, err)
++	configured := Labels{arm, native}
++	require.Equal(t, "example/image:tag", configured.PickPlatform([]string{"self-hosted", "linux-arm64"}))
++	require.Equal(t, "linux/arm64", configured.PickDockerImagePlatform([]string{"self-hosted", "linux-arm64"}))
++	require.Empty(t, configured.PickDockerImagePlatform([]string{"native", "linux-arm64"}))
++	require.Empty(t, configured.PickPlatform([]string{"unmatched"}))
++	encoded := configured.ToStrings()
++	roundtrip, err := Parse(encoded[0])
++	require.NoError(t, err)
++	require.Equal(t, arm, roundtrip)
++	for _, query := range []string{"platform=", "platform=linux/arm64&platform=linux/amd64", "other=value", "platform=%"} {
++		_, err := Parse("bad:docker://image?" + query)
++		require.Error(t, err)
++	}
++	for _, value := range []string{"pool:id?question", "host:host", "cluster:kubernetes://image"} {
++		label, err := Parse(value)
++		require.NoError(t, err)
++		require.Equal(t, []string{value}, (Labels{label}).ToStrings())
++	}
++}

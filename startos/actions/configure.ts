@@ -1,98 +1,153 @@
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
-import { mount } from '../utils'
 import { storeJson } from '../fileModels/store.json'
-
-const { InputSpec, Value } = sdk
-
-const inputSpec = InputSpec.of({
-  registrationToken: Value.text({
-    name: i18n('Registration Token'),
-    description: i18n(
-      'A runner registration token from the Gitea instance, under Site/Org/Repo Settings → Actions → Runners → Create new Runner.',
-    ),
-    required: true,
-    default: null,
-  }),
-  runnerName: Value.text({
-    name: i18n('Runner Name'),
-    description: i18n('A name to identify this runner in the Gitea UI.'),
-    required: false,
-    default: 'startos-runner',
-  }),
-  labels: Value.text({
-    name: i18n('Labels'),
-    description: i18n(
-      'Comma-separated runner labels — syntax "name:docker://image" or "name:host". Adding a foreign-arch label also serves emulated jobs, which are much slower; prefer a native runner per architecture.',
-    ),
-    required: false,
-    default: 'ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-22.04',
-  }),
-  capacity: Value.number({
-    name: i18n('Concurrent Jobs'),
-    description: i18n(
-      "Every job running at the same time adds its own build's CPU and memory use on this device. Raise it only if the device can carry several builds at once.",
-    ),
-    required: true,
-    default: 1,
-    min: 1,
-    integer: true,
-  }),
-})
+import { runnerState } from '../fileModels/runnerState'
+import { registrationReceipt } from '../fileModels/registrationReceipt'
+import {
+  DEFAULT_RUNNER_LABELS,
+  MAX_JOB_CAPACITY,
+  registrationPending,
+  registrationName,
+  registrationUsable,
+  runnerLabels,
+  virtualizationAvailable,
+  vmResources,
+  vmDiskSize,
+} from '../utils'
 
 export const configure = sdk.Action.withInput(
   'configure',
-
-  async ({ effects }) => ({
+  async () => ({
     name: i18n('Configure'),
     description: i18n(
-      'Register this runner with the Gitea on this device. Saving re-registers on the next restart, so provide a fresh registration token each time.',
+      'Configure execution without replacing the runner identity. Supply a fresh registration token only to create or replace the registration.',
     ),
-    warning: null,
+    warning: i18n('Saving stops active jobs and restarts the runner.'),
     allowedStatuses: 'any',
     group: null,
     visibility: 'enabled',
   }),
-
-  inputSpec,
-
   async ({ effects }) => {
-    const s = await storeJson.read().once()
-    if (!s) return null
+    const available = await virtualizationAvailable(effects)
+    const registered = await runnerState.read().once()
+    const store = await storeJson.read().once()
+    const receipt = await registrationReceipt.read().once()
+    const pending = store && registrationPending(store, !!registered, receipt)
+    return sdk.InputSpec.of({
+      registrationToken: sdk.Value.text({
+        name: i18n('Registration Token'),
+        description: i18n(
+          'Leave blank to keep the existing registration. A fresh token creates or replaces the registration; runtime settings do not require one.',
+        ),
+        required: !registrationUsable(registered) && !pending,
+        default: null,
+        masked: true,
+      }),
+      runnerName: sdk.Value.text({
+        name: i18n('Runner Name'),
+        description: i18n('A name to identify this runner in the Gitea UI.'),
+        required: false,
+        default: 'startos-runner',
+      }),
+      labels: sdk.Value.text({
+        name: i18n('Labels'),
+        description: i18n(
+          'Runner labels must use name:docker://image. Host labels are not allowed.',
+        ),
+        required: true,
+        default: DEFAULT_RUNNER_LABELS,
+      }),
+      capacity: sdk.Value.number({
+        name: i18n('Concurrent Jobs'),
+        description: i18n(
+          'Maximum concurrent assignments. Reusable-workflow jobs run sequentially within each assignment. VMs share one guest-memory pool; a job may wait for memory.',
+        ),
+        required: true,
+        default: 1,
+        min: 1,
+        max: MAX_JOB_CAPACITY,
+        integer: true,
+      }),
+      emulation: sdk.Value.toggle({
+        name: i18n('Enable Emulation'),
+        description: i18n(
+          'Also serve jobs for the other CPU architecture, run under emulation (much slower than native). Appends a foreign-architecture label pinned to that platform; prefer a native runner per architecture for regular builds.',
+        ),
+        default: false,
+      }),
+      virtualization: sdk.Value.dynamicToggle(async () => ({
+        name: i18n('Virtualization'),
+        description: i18n(
+          'Run each job in a disposable VM with its own guest kernel. Container mode starts faster and uses less memory, but shares the StartOS kernel. VM failures do not switch to container mode.',
+        ),
+        default: available,
+        disabled: available
+          ? false
+          : i18n(
+              'KVM hardware virtualization is unavailable on this device. Jobs run in containers that share the StartOS kernel.',
+            ),
+      })),
+    })
+  },
+  async ({ effects }) => {
+    const store = await storeJson.read().once()
+    if (!store) return null
+    const registered = await runnerState.read().once()
+    const receipt = await registrationReceipt.read().once()
     return {
-      registrationToken: s.registrationToken || undefined,
-      runnerName: s.runnerName || null,
-      labels: s.labels,
-      capacity: s.capacity,
+      registrationToken: undefined,
+      runnerName: registrationName(store, registered, receipt),
+      labels: store.labels,
+      capacity: store.capacity,
+      emulation: store.emulation,
+      virtualization:
+        (await virtualizationAvailable(effects)) && store.virtualization,
     }
   },
-
   async ({ effects, input }) => {
+    const store = await storeJson.read().once()
+    if (!store) throw new Error(i18n('Store not found'))
+    const registered = await runnerState.read().once()
+    const receipt = await registrationReceipt.read().once()
+    const pending = registrationPending(store, !!registered, receipt)
+    const token = input.registrationToken?.trim() || ''
+    const previousName = registrationName(store, registered, receipt)
+    const name = input.runnerName?.trim() || previousName
+    if (!token && registered && name !== previousName) {
+      throw new Error(
+        i18n('Changing the runner name requires a fresh registration token.'),
+      )
+    }
+    if (!registrationUsable(registered) && !pending && !token) {
+      throw new Error(
+        i18n('A fresh registration token is required to register this runner.'),
+      )
+    }
+    runnerLabels(input)
+    if (input.virtualization) {
+      if (!(await virtualizationAvailable(effects))) {
+        throw new Error(
+          i18n(
+            'KVM hardware virtualization is unavailable on this device. Jobs run in containers that share the StartOS kernel.',
+          ),
+        )
+      }
+      vmResources(input.capacity)
+      await vmDiskSize(effects, input.capacity)
+    }
     await storeJson.merge(effects, {
-      registrationToken: input.registrationToken,
-      runnerName: input.runnerName ?? '',
-      labels: input.labels ?? '',
+      registrationToken: token || (pending ? store.registrationToken : ''),
+      registrationRevision: store.registrationRevision + (token ? 1 : 0),
+      runnerName: name,
+      labels: input.labels,
       capacity: input.capacity,
+      emulation: input.emulation,
+      virtualization: input.virtualization,
     })
-
-    // Drop the registration state so the runner re-registers with the new
-    // settings (and the freshly supplied token) on the next start.
-    await sdk.SubContainer.withTemp(
-      effects,
-      { imageId: 'main' },
-      mount,
-      'reset-registration',
-      async (sub) => {
-        await sub.exec(['rm', '-f', '/data/runner/.runner'])
-      },
-    )
-
     return {
       version: '1',
       title: i18n('Saved'),
-      message: i18n(
-        'Runner configuration saved. Restart the service to (re)register with these settings.',
-      ),
+      message: i18n('Runner configuration saved.'),
       result: null,
     }
   },

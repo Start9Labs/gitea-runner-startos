@@ -1,6 +1,6 @@
 # overrides to s9pk.mk must precede the include statement
-# The gitea-runner binary ships only x86_64 + aarch64 (no riscv64), so skip
-# riscv. (Foreign-arch *jobs* are still built via the host's qemu binfmt; this
-# is only about which arches the runner package itself runs on.)
+# The shared guest images support these package architectures.
 ARCHES := x86 arm
 include node_modules/@start9labs/start-sdk/s9pk.mk
+
+javascript/index.js: $(shell find node_modules/forgejo-runner-startos/runtime -name '*.ts' 2>/dev/null)

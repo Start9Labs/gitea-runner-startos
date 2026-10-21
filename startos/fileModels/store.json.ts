@@ -1,15 +1,15 @@
 import { FileHelper, z } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
+import { DEFAULT_RUNNER_LABELS, MAX_JOB_CAPACITY } from '../utils'
 
 const shape = z.looseObject({
   registrationToken: z.string().catch(''),
+  registrationRevision: z.number().int().nonnegative().catch(0),
   runnerName: z.string().catch(''),
-  // gitea-runner label syntax: "<name>:docker://<image>" or "<name>:host".
-  // Add foreign-arch labels here to also serve emulated jobs (slow — see README).
-  labels: z
-    .string()
-    .catch('ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-22.04'),
-  capacity: z.number().int().catch(1),
+  labels: z.string().catch(DEFAULT_RUNNER_LABELS),
+  capacity: z.number().int().min(1).max(MAX_JOB_CAPACITY).catch(1),
+  emulation: z.boolean().catch(false),
+  virtualization: z.boolean().catch(true),
 })
 
 export const storeJson = FileHelper.json(

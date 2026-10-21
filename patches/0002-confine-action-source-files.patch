@@ -1,0 +1,589 @@
+Subject: [PATCH] Confine host action reads and writes to their repository
+
+Retire when upstream confines metadata, synthetic files, compatibility bundles and Docker build inputs.
+
+diff --git a/act/container/docker_build.go b/act/container/docker_build.go
+index 2e072252..c55c15ad 100644
+--- a/act/container/docker_build.go
++++ b/act/container/docker_build.go
+@@ -87,14 +87,19 @@ func createBuildContext(ctx context.Context, contextDir, relDockerfile string) (
+ 	// And canonicalize dockerfile name to a platform-independent one
+ 	relDockerfile = filepath.ToSlash(relDockerfile)
+ 
+-	f, err := os.Open(filepath.Join(contextDir, ".dockerignore"))
++	source, err := os.OpenRoot(contextDir)
++	if err != nil {
++		return nil, err
++	}
++	defer source.Close()
++	f, err := source.Open(".dockerignore")
+ 	if err != nil && !os.IsNotExist(err) {
+ 		return nil, err
+ 	}
+-	defer f.Close()
+ 
+ 	var excludes []string
+ 	if err == nil {
++		defer f.Close()
+ 		excludes, err = ignorefile.ReadAll(f)
+ 		if err != nil {
+ 			return nil, err
+diff --git a/act/container/docker_build_boundary_test.go b/act/container/docker_build_boundary_test.go
+new file mode 100644
+index 00000000..180f7d80
+--- /dev/null
++++ b/act/container/docker_build_boundary_test.go
+@@ -0,0 +1,50 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++//go:build !(WITHOUT_DOCKER || !(linux || darwin || windows || netbsd))
++
++package container
++
++import (
++	"archive/tar"
++	"io"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestBuildContextIgnoreBoundary(t *testing.T) {
++	for _, linked := range []bool{false, true} {
++		t.Run(map[bool]string{false: "regular", true: "outside-link"}[linked], func(t *testing.T) {
++			contextDir := t.TempDir()
++			require.NoError(t, os.WriteFile(filepath.Join(contextDir, "Dockerfile"), []byte("FROM scratch\n"), 0o600))
++			if linked {
++				outside := filepath.Join(t.TempDir(), "private-ignore")
++				require.NoError(t, os.WriteFile(outside, []byte("hidden\n"), 0o600))
++				require.NoError(t, os.Symlink(outside, filepath.Join(contextDir, ".dockerignore")))
++			} else {
++				require.NoError(t, os.WriteFile(filepath.Join(contextDir, ".dockerignore"), []byte("hidden\n"), 0o600))
++			}
++			archive, err := createBuildContext(t.Context(), contextDir, "Dockerfile")
++			if linked {
++				require.Error(t, err)
++				return
++			}
++			require.NoError(t, err)
++			defer archive.Close()
++			reader := tar.NewReader(archive)
++			found := false
++			for {
++				header, err := reader.Next()
++				if err == io.EOF {
++					break
++				}
++				require.NoError(t, err)
++				found = found || header.Name == "Dockerfile"
++			}
++			require.True(t, found)
++		})
++	}
++}
+diff --git a/act/runner/action.go b/act/runner/action.go
+index 8be1cc32..bf4159f8 100644
+--- a/act/runner/action.go
++++ b/act/runner/action.go
+@@ -153,7 +153,7 @@ func maybeCopyToActionDir(ctx context.Context, step actionStep, actionDir, actio
+ 
+ 	if !rc.Config.NoActionPatch {
+ 		// A concurrent job's prepare resets this directory, so patch under the copy's lock.
+-		defer patchActions(ctx, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
++		defer patchActions(ctx, actionDir, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
+ 	}
+ 
+ 	return rc.JobContainer.CopyDir(containerActionDirCopy, actionDir+"/", rc.Config.UseGitIgnore, true)(ctx)
+@@ -306,6 +306,17 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+ 	} else {
+ 		image = rc.dockerActionImage(ctx, step, actionName, localAction)
+ 		contextDir, fileName := filepath.Split(filepath.Join(basedir, action.Runs.Image))
++		if !localAction {
++			actionPath, err := filepath.Rel(actionDir, basedir)
++			if err != nil {
++				return err
++			}
++			directory, filename, err := remoteActionBuildContext(actionDir, actionPath, action.Runs.Image)
++			if err != nil {
++				return err
++			}
++			contextDir, fileName = directory, filename
++		}
+ 
+ 		anyArchExists, err := ContainerImageExistsLocally(ctx, image, "any")
+ 		if err != nil {
+diff --git a/act/runner/action_source.go b/act/runner/action_source.go
+new file mode 100644
+index 00000000..7b400668
+--- /dev/null
++++ b/act/runner/action_source.go
+@@ -0,0 +1,48 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package runner
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++)
++
++func remoteActionBuildContext(repository, actionPath, image string) (string, string, error) {
++	name := filepath.Join(actionPath, image)
++	if filepath.IsAbs(actionPath) || filepath.IsAbs(image) || !filepath.IsLocal(name) {
++		return "", "", errors.New("action Dockerfile must remain inside its repository")
++	}
++	source, err := os.OpenRoot(repository)
++	if err != nil {
++		return "", "", err
++	}
++	defer source.Close()
++	file, err := source.Open(name)
++	if err != nil {
++		return "", "", fmt.Errorf("open action Dockerfile: %w", err)
++	}
++	info, err := file.Stat()
++	file.Close()
++	if err != nil {
++		return "", "", err
++	}
++	if !info.Mode().IsRegular() {
++		return "", "", errors.New("action Dockerfile is not a regular file")
++	}
++	canonicalRepository, err := filepath.EvalSymlinks(repository)
++	if err != nil {
++		return "", "", err
++	}
++	contextDir, err := filepath.EvalSymlinks(filepath.Join(canonicalRepository, filepath.Dir(name)))
++	if err != nil {
++		return "", "", err
++	}
++	relative, err := filepath.Rel(canonicalRepository, contextDir)
++	if err != nil || !filepath.IsLocal(relative) {
++		return "", "", errors.New("action build context escapes its repository")
++	}
++	return contextDir, filepath.Base(name), nil
++}
+diff --git a/act/runner/action_source_test.go b/act/runner/action_source_test.go
+new file mode 100644
+index 00000000..115c5150
+--- /dev/null
++++ b/act/runner/action_source_test.go
+@@ -0,0 +1,124 @@
++// Copyright 2026 The Gitea Authors. All rights reserved.
++// SPDX-License-Identifier: MIT
++
++package runner
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"gitea.com/gitea/runner/act/common"
++	"gitea.com/gitea/runner/act/common/git"
++
++	"gitea.dev/actionslib/pkg/model"
++	"github.com/stretchr/testify/require"
++)
++
++func TestRemoteMetadataAndFallbackBoundary(t *testing.T) {
++	for _, target := range []string{"regular", "action.yml", "trampoline.js"} {
++		t.Run(target, func(t *testing.T) {
++			outside := filepath.Join(t.TempDir(), "controller-secret")
++			metadata := []byte("name: fixture\nruns:\n  using: node20\n  main: index.js\n")
++			require.NoError(t, os.WriteFile(outside, metadata, 0o600))
++			setCloneExecutor(t, func(input git.NewGitCloneExecutorInput) common.Executor {
++				return func(context.Context) error {
++					directory := filepath.Join(input.Dir, "action")
++					if err := os.MkdirAll(directory, 0o700); err != nil {
++						return err
++					}
++					if target == "regular" {
++						return os.WriteFile(filepath.Join(directory, "action.yml"), metadata, 0o600)
++					}
++					return os.Symlink(outside, filepath.Join(directory, target))
++				}
++			})
++			sar := &stepActionRemote{
++				Step: &model.Step{Uses: "org/repo/action@v1", With: map[string]string{"args": "echo fixture"}},
++				RunContext: &RunContext{
++					Config: &Config{Workdir: t.TempDir(), ActionCacheDir: t.TempDir(), GitHubInstance: "https://example.invalid"},
++					Run:    &model.Run{JobID: "build", Workflow: &model.Workflow{Jobs: map[string]*model.Job{"build": {}}}},
++				},
++				readAction: readActionImpl,
++			}
++			err := sar.prepareActionExecutor()(t.Context())
++			if target == "regular" {
++				require.NoError(t, err)
++			} else {
++				require.Error(t, err)
++			}
++			contents, err := os.ReadFile(outside)
++			require.NoError(t, err)
++			require.Equal(t, metadata, contents)
++		})
++	}
++}
++
++func TestRemoteDockerBuildBoundary(t *testing.T) {
++	root := t.TempDir()
++	repository := filepath.Join(root, "repository")
++	outside := filepath.Join(root, "repository-neighbor")
++	for _, directory := range []string{repository, outside, filepath.Join(repository, "actions"), filepath.Join(repository, "actions", "nested")} {
++		require.NoError(t, os.MkdirAll(directory, 0o700))
++		require.NoError(t, os.WriteFile(filepath.Join(directory, "Dockerfile"), []byte("FROM scratch\n"), 0o600))
++	}
++	require.NoError(t, os.Symlink(outside, filepath.Join(repository, "escape-dir")))
++	require.NoError(t, os.Symlink(filepath.Join(outside, "Dockerfile"), filepath.Join(repository, "escape-file")))
++	require.NoError(t, os.Symlink("actions", filepath.Join(repository, "internal-dir")))
++	for _, test := range []struct {
++		name, action, image, expected string
++		invalid                       bool
++	}{
++		{"root", "", "Dockerfile", repository, false},
++		{"nested", "actions/nested", "Dockerfile", filepath.Join(repository, "actions", "nested"), false},
++		{"internal-parent", "actions/nested", "../Dockerfile", filepath.Join(repository, "actions"), false},
++		{"internal-link", "", "internal-dir/Dockerfile", filepath.Join(repository, "actions"), false},
++		{"parent", "", "../repository-neighbor/Dockerfile", "", true},
++		{"action-parent", "../repository-neighbor", "Dockerfile", "", true},
++		{"absolute-image", "", filepath.Join(outside, "Dockerfile"), "", true},
++		{"absolute-action", outside, "Dockerfile", "", true},
++		{"linked-directory", "", "escape-dir/Dockerfile", "", true},
++		{"linked-file", "", "escape-file", "", true},
++		{"directory", "", "actions", "", true},
++	} {
++		t.Run(test.name, func(t *testing.T) {
++			directory, filename, err := remoteActionBuildContext(repository, test.action, test.image)
++			if test.invalid {
++				require.Error(t, err)
++				return
++			}
++			require.NoError(t, err)
++			expected, err := filepath.EvalSymlinks(test.expected)
++			require.NoError(t, err)
++			require.Equal(t, expected, directory)
++			require.Equal(t, "Dockerfile", filename)
++		})
++	}
++}
++
++func TestActionBundleReadWriteBoundary(t *testing.T) {
++	repository := t.TempDir()
++	outside := filepath.Join(t.TempDir(), "private.js")
++	require.NoError(t, os.WriteFile(outside, []byte(gateTSC), 0o600))
++	script := filepath.Join(repository, "index.js")
++	require.NoError(t, os.Symlink(outside, script))
++	source, err := os.OpenRoot(repository)
++	require.NoError(t, err)
++	defer source.Close()
++	original, err := patchBundle(source, "index.js")
++	require.Error(t, err)
++	require.Nil(t, original)
++	require.NoError(t, os.Remove(script))
++	require.NoError(t, os.WriteFile(script, []byte(gateTSC), 0o600))
++	restore := patchActions(t.Context(), repository, []string{script})
++	patched, err := os.ReadFile(script)
++	require.NoError(t, err)
++	require.True(t, gateOpened(string(patched)))
++	require.NoError(t, os.Remove(script))
++	require.NoError(t, os.Symlink(outside, script))
++	restore()
++	contents, err := os.ReadFile(outside)
++	require.NoError(t, err)
++	require.Equal(t, gateTSC, string(contents))
++}
+diff --git a/act/runner/action_test.go b/act/runner/action_test.go
+index 94222d59..0ad58334 100644
+--- a/act/runner/action_test.go
++++ b/act/runner/action_test.go
+@@ -403,6 +403,7 @@ func TestMaybeCopyToActionDirHoldsCloneLock(t *testing.T) {
+ 
+ func TestExecAsDockerHoldsCloneLockForRemoteUncached(t *testing.T) {
+ 	actionDir := t.TempDir()
++	require.NoError(t, os.WriteFile(filepath.Join(actionDir, "Dockerfile"), []byte("FROM scratch\n"), 0o600))
+ 
+ 	unlock, err := git.AcquireCloneLock(t.Context(), actionDir)
+ 	require.NoError(t, err)
+diff --git a/act/runner/patch_actions.go b/act/runner/patch_actions.go
+index c82f75d7..8ec6d327 100644
+--- a/act/runner/patch_actions.go
++++ b/act/runner/patch_actions.go
+@@ -106,20 +106,31 @@ func actionScriptPaths(dir string, action *model.Action) []string {
+ }
+ 
+ // patchActions returns a restore: the tree is shared, so a job with patching off gets no edits.
+-func patchActions(ctx context.Context, scripts []string) func() {
++func patchActions(ctx context.Context, repository string, scripts []string) func() {
++	source, err := os.OpenRoot(repository)
++	if err != nil {
++		common.Logger(ctx).Warnf("actions toolkit: cannot open source repository: %v", err)
++		return func() {}
++	}
+ 	restore := map[string][]byte{}
+ 	for _, script := range scripts {
+-		original, err := patchBundle(script)
++		relative, err := filepath.Rel(repository, script)
++		if err != nil {
++			common.Logger(ctx).Warnf("actions toolkit: cannot resolve script: %v", err)
++			continue
++		}
++		original, err := patchBundle(source, relative)
+ 		if original != nil {
+-			restore[script] = original // also when the write failed part way through
++			restore[relative] = original // also when the write failed part way through
+ 		}
+ 		if err != nil {
+ 			common.Logger(ctx).Warnf("actions toolkit: %s left unpatched: %v", script, err)
+ 		}
+ 	}
+ 	return func() {
++		defer source.Close()
+ 		for script, original := range restore {
+-			if err := os.WriteFile(script, original, 0o644); err != nil { //nolint:gosec // as the checkout wrote it
++			if err := source.WriteFile(script, original, 0o644); err != nil {
+ 				common.Logger(ctx).Warnf("actions toolkit: %s left patched in the shared copy: %v", script, err)
+ 			}
+ 		}
+@@ -127,15 +138,15 @@ func patchActions(ctx context.Context, scripts []string) func() {
+ }
+ 
+ // patchBundle returns the bytes it replaced, or nil when it left the bundle alone.
+-func patchBundle(script string) ([]byte, error) {
+-	info, err := os.Stat(script)
++func patchBundle(source *os.Root, script string) ([]byte, error) {
++	info, err := source.Stat(script)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 	if info.Size() > maxBundleSize {
+ 		return nil, nil
+ 	}
+-	data, err := os.ReadFile(script)
++	data, err := source.ReadFile(script)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -143,7 +154,7 @@ func patchBundle(script string) ([]byte, error) {
+ 	if !ok {
+ 		return nil, nil
+ 	}
+-	return data, os.WriteFile(script, patched, info.Mode().Perm())
++	return data, source.WriteFile(script, patched, info.Mode().Perm())
+ }
+ 
+ // patchedBundle opens the GHES gate, and where the cache toolkit is present, points the cache
+diff --git a/act/runner/patch_actions_e2e_test.go b/act/runner/patch_actions_e2e_test.go
+index 5a8d14cc..d9affedd 100644
+--- a/act/runner/patch_actions_e2e_test.go
++++ b/act/runner/patch_actions_e2e_test.go
+@@ -116,7 +116,7 @@ func patchedAction(t *testing.T, repo, ref, entrypoint string) string {
+ 	require.NoError(t, err)
+ 	script := filepath.Join(tempDirPath(t), filepath.Base(entrypoint))
+ 	require.NoError(t, os.WriteFile(script, body, 0o600))
+-	patchActions(t.Context(), []string{script})
++	t.Cleanup(patchActions(t.Context(), filepath.Dir(script), []string{script}))
+ 	return script
+ }
+ 
+diff --git a/act/runner/patch_actions_test.go b/act/runner/patch_actions_test.go
+index bc7e8e4f..3e8d16e8 100644
+--- a/act/runner/patch_actions_test.go
++++ b/act/runner/patch_actions_test.go
+@@ -175,15 +175,18 @@ func TestPatchedBundleSurvivesInsideAStringLiteral(t *testing.T) {
+ // An action with a pre step is copied, and so patched, twice.
+ func TestPatchBundleIsIdempotent(t *testing.T) {
+ 	script := bundleFile(t, gateTSC)
++	source, err := os.OpenRoot(filepath.Dir(script))
++	require.NoError(t, err)
++	defer source.Close()
+ 
+-	original, err := patchBundle(script)
++	original, err := patchBundle(source, filepath.Base(script))
+ 	require.NoError(t, err)
+ 	require.NotNil(t, original)
+ 	patched, err := os.ReadFile(script)
+ 	require.NoError(t, err)
+ 	require.True(t, gateOpened(string(patched)))
+ 
+-	original, err = patchBundle(script)
++	original, err = patchBundle(source, filepath.Base(script))
+ 	require.NoError(t, err)
+ 	assert.Nil(t, original, "a patched bundle is not patched again")
+ 	again, err := os.ReadFile(script)
+@@ -193,8 +196,11 @@ func TestPatchBundleIsIdempotent(t *testing.T) {
+ 
+ func TestPatchBundleLeavesOtherActionsAlone(t *testing.T) {
+ 	script := bundleFile(t, `console.log("checkout")`)
++	source, err := os.OpenRoot(filepath.Dir(script))
++	require.NoError(t, err)
++	defer source.Close()
+ 
+-	original, err := patchBundle(script)
++	original, err := patchBundle(source, filepath.Base(script))
+ 	require.NoError(t, err)
+ 	assert.Nil(t, original)
+ 	body, err := os.ReadFile(script)
+diff --git a/act/runner/step_action_local.go b/act/runner/step_action_local.go
+index ec715f8f..e7214e05 100644
+--- a/act/runner/step_action_local.go
++++ b/act/runner/step_action_local.go
+@@ -16,6 +16,7 @@ import (
+ 	"path/filepath"
+ 
+ 	"gitea.com/gitea/runner/act/common"
++	"gitea.com/gitea/runner/act/container"
+ 
+ 	"gitea.dev/actionslib/pkg/model"
+ )
+@@ -80,7 +81,15 @@ func (sal *stepActionLocal) main() common.Executor {
+ 			return nil, nil, fmt.Errorf("max depth %d of symlinks exceeded while reading %s", maxSymlinkDepth, spath)
+ 		}
+ 
+-		actionModel, err := sal.readAction(ctx, sal.Step, actionDir, "", localReader, os.WriteFile)
++		localWriter := func(filename string, data []byte, mode fs.FileMode) error {
++			_, destination := getContainerActionPaths(sal.Step, filepath.Dir(filename), sal.RunContext)
++			return sal.RunContext.JobContainer.Copy(destination, &container.FileEntry{
++				Name: filepath.Base(filename),
++				Mode: int64(mode),
++				Body: string(data),
++			})(ctx)
++		}
++		actionModel, err := sal.readAction(ctx, sal.Step, actionDir, "", localReader, localWriter)
+ 		if err != nil {
+ 			return err
+ 		}
+diff --git a/act/runner/step_action_local_test.go b/act/runner/step_action_local_test.go
+index b6c09497..0afe5828 100644
+--- a/act/runner/step_action_local_test.go
++++ b/act/runner/step_action_local_test.go
+@@ -8,15 +8,18 @@ import (
+ 	"bytes"
+ 	"context"
+ 	"io"
++	"os"
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
+ 
+ 	"gitea.com/gitea/runner/act/common"
++	"gitea.com/gitea/runner/act/container"
+ 
+ 	"gitea.dev/actionslib/pkg/model"
+ 	"github.com/stretchr/testify/assert"
+ 	"github.com/stretchr/testify/mock"
++	"github.com/stretchr/testify/require"
+ 	"go.yaml.in/yaml/v4"
+ )
+ 
+@@ -36,6 +39,9 @@ func (salm *stepActionLocalMocks) readAction(_ context.Context, step *model.Step
+ 
+ func TestStepActionLocalTest(t *testing.T) {
+ 	ctx := t.Context()
++	workdir := t.TempDir()
++	actionDir := filepath.Join(workdir, "path", "to", "action")
++	require.NoError(t, os.MkdirAll(actionDir, 0o700))
+ 
+ 	cm := &containerMock{}
+ 	salm := &stepActionLocalMocks{}
+@@ -47,7 +53,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 			StepResults: map[string]*model.StepResult{},
+ 			ExprEval:    &expressionEvaluator{},
+ 			Config: &Config{
+-				Workdir: "/tmp",
++				Workdir: workdir,
+ 			},
+ 			Run: &model.Run{
+ 				JobID: "1",
+@@ -71,8 +77,14 @@ func TestStepActionLocalTest(t *testing.T) {
+ 		},
+ 	}
+ 
+-	salm.On("readAction", sal.Step, filepath.Clean("/tmp/path/to/action"), "", mock.Anything, mock.Anything).
+-		Return(&model.Action{}, nil)
++	salm.On("readAction", sal.Step, actionDir, "", mock.Anything, mock.Anything).
++		Run(func(args mock.Arguments) {
++			writer := args.Get(4).(fileWriter)
++			require.NoError(t, writer(filepath.Join(actionDir, "trampoline.js"), []byte("fixture"), 0o400))
++		}).Return(&model.Action{}, nil)
++	cm.On("Copy", actionDir, mock.MatchedBy(func(files []*container.FileEntry) bool {
++		return len(files) == 1 && files[0].Name == "trampoline.js" && files[0].Body == "fixture" && files[0].Mode == 0o400
++	})).Return(noopExecutor).Once()
+ 
+ 	cm.On("Copy", "/var/run/act", mock.AnythingOfType("[]*container.FileEntry")).Return(noopExecutor)
+ 
+@@ -84,7 +96,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 
+ 	cm.On("GetContainerArchive", ctx, "/var/run/act/workflow/pathcmd.txt").Return(io.NopCloser(&bytes.Buffer{}), nil)
+ 
+-	salm.On("runAction", sal, filepath.Clean("/tmp/path/to/action"), (*remoteAction)(nil)).Return(noopExecutor)
++	salm.On("runAction", sal, actionDir, (*remoteAction)(nil)).Return(noopExecutor)
+ 
+ 	err := sal.pre()(ctx)
+ 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+@@ -92,6 +104,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 	err = sal.main()(ctx)
+ 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+ 
++	require.NoFileExists(t, filepath.Join(actionDir, "trampoline.js"))
+ 	cm.AssertExpectations(t)
+ 	salm.AssertExpectations(t)
+ }
+diff --git a/act/runner/step_action_remote.go b/act/runner/step_action_remote.go
+index d13d1686..d2bfe89f 100644
+--- a/act/runner/step_action_remote.go
++++ b/act/runner/step_action_remote.go
+@@ -101,12 +101,24 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
+ 			sar.resolvedSha = sha
+ 		}
+ 
++		source, err := os.OpenRoot(actionDir)
++		if err != nil {
++			return err
++		}
++		defer source.Close()
+ 		remoteReader := func(filename string) (io.Reader, io.Closer, error) {
+-			f, err := os.Open(filepath.Join(actionDir, sar.remoteAction.Path, filename))
++			f, err := source.Open(filepath.Join(sar.remoteAction.Path, filename))
+ 			return f, f, err
+ 		}
++		remoteWriter := func(filename string, data []byte, mode os.FileMode) error {
++			relative, err := filepath.Rel(actionDir, filename)
++			if err != nil {
++				return err
++			}
++			return source.WriteFile(relative, data, mode)
++		}
+ 
+-		actionModel, err := sar.readAction(ctx, sar.Step, actionDir, sar.remoteAction.Path, remoteReader, os.WriteFile)
++		actionModel, err := sar.readAction(ctx, sar.Step, actionDir, sar.remoteAction.Path, remoteReader, remoteWriter)
+ 		sar.action = actionModel
+ 		return err
+ 	}
+diff --git a/act/runner/step_action_remote_test.go b/act/runner/step_action_remote_test.go
+index 95b0fcc2..340bd432 100644
+--- a/act/runner/step_action_remote_test.go
++++ b/act/runner/step_action_remote_test.go
+@@ -37,7 +37,15 @@ func actionDirSuffix(suffix string) any {
+ 
+ func setCloneExecutor(t *testing.T, executor func(git.NewGitCloneExecutorInput) common.Executor) {
+ 	original := stepActionRemoteNewCloneExecutor
+-	stepActionRemoteNewCloneExecutor = executor
++	stepActionRemoteNewCloneExecutor = func(input git.NewGitCloneExecutorInput) common.Executor {
++		clone := executor(input)
++		return func(ctx context.Context) error {
++			if err := clone(ctx); err != nil {
++				return err
++			}
++			return os.MkdirAll(input.Dir, 0o755)
++		}
++	}
+ 	t.Cleanup(func() { stepActionRemoteNewCloneExecutor = original })
+ }
+ 

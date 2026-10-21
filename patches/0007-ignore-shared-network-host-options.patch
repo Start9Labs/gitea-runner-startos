@@ -1,0 +1,50 @@
+Subject: [PATCH] Omit inherited extra hosts for shared-network action containers
+
+Retire when upstream accepts job host aliases without passing them to Docker actions
+that share the job's network namespace. Docker rejects that combination at create.
+
+diff --git a/act/container/docker_run.go b/act/container/docker_run.go
+--- a/act/container/docker_run.go
++++ b/act/container/docker_run.go
+@@ -591,6 +591,10 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config *co
+ 		}
+ 	}
+ 
++	if container.NetworkMode(cr.input.NetworkMode).IsContainer() {
++		copts.extraHosts = opts.NewListOpts(opts.ValidateExtraHost)
++	}
++
+ 	// If the `privileged` config has been disabled, `copts.privileged` need to be forced to false,
+ 	// even if the user specifies `--privileged` in the options string.
+ 	if !hostConfig.Privileged && copts.privileged {
+diff --git a/act/container/docker_run_test.go b/act/container/docker_run_test.go
+--- a/act/container/docker_run_test.go
++++ b/act/container/docker_run_test.go
+@@ -730,6 +730,27 @@ func mergeOptions(t *testing.T, runnerOptions, workflowOptions string, privileged
+ 	return hostConfig, hook
+ }
+ 
++func TestMergeContainerConfigsHostsWithSharedNetwork(t *testing.T) {
++	for _, mode := range []string{"bridge", "container:job"} {
++		t.Run(mode, func(t *testing.T) {
++			cr := &containerReference{input: &NewContainerInput{
++				NetworkMode:     mode,
++				RunnerOptions:   "--add-host forge.local:10.0.3.1",
++				WorkflowOptions: "--add-host custom.local:10.0.3.2",
++			}}
++			_, hostConfig, err := cr.mergeContainerConfigs(t.Context(), &container.Config{}, &container.HostConfig{
++				NetworkMode: container.NetworkMode(mode),
++			})
++			require.NoError(t, err)
++			if container.NetworkMode(mode).IsContainer() {
++				assert.Empty(t, hostConfig.ExtraHosts)
++			} else {
++				assert.ElementsMatch(t, []string{"forge.local:10.0.3.1", "custom.local:10.0.3.2"}, hostConfig.ExtraHosts)
++			}
++		})
++	}
++}
++
+ func TestMergeContainerConfigsStripsDangerousOptionsWhenUnprivileged(t *testing.T) {
+ 	// OS-independent options only, --device and --gpus need a linux/windows server OS
+ 	const dangerousOptions = "--pid=host --ipc=host --uts=host --cgroupns=host " +

@@ -8,15 +8,15 @@ export const short = {
 
 export const long = {
   en_US:
-    'Gitea Runner executes Gitea Actions workflows for the Gitea instance on this device, running each job inside an isolated, rootless OCI container. Published under the MIT license.',
+    'Gitea Runner executes Actions workflows for Gitea on this device. With accessible KVM, assignments use disposable VMs sharing a bounded guest-memory pool; no guests run while idle. Optional container mode shares the StartOS kernel and should run trusted workflows only. Supports configurable concurrency and emulated jobs for the other CPU architecture. Gitea Runner is published under the MIT license.',
   es_ES:
-    'Gitea Runner ejecuta flujos de trabajo de Gitea Actions para la instancia de Gitea en este dispositivo, ejecutando cada tarea dentro de un contenedor OCI aislado y sin privilegios de root. Publicado bajo la licencia MIT.',
+    'Gitea Runner ejecuta flujos de Actions para Gitea en este dispositivo. Con KVM accesible, las tareas usan máquinas virtuales desechables con un fondo de memoria limitado; no hay máquinas en reposo. El modo contenedor opcional comparte el núcleo de StartOS y debe ejecutar solo flujos de confianza. Admite concurrencia configurable y emulación de la otra arquitectura CPU. Gitea Runner se publica bajo la licencia MIT.',
   de_DE:
-    'Gitea Runner führt Gitea-Actions-Workflows für die Gitea-Instanz auf diesem Gerät aus und lässt jeden Auftrag in einem isolierten, rootless OCI-Container laufen. Veröffentlicht unter der MIT-Lizenz.',
+    'Gitea Runner führt Actions-Workflows für Gitea auf diesem Gerät aus. Bei zugänglichem KVM nutzen Aufträge kurzlebige VMs mit begrenztem gemeinsamen Gastspeicher; im Leerlauf laufen keine Gäste. Der optionale Containermodus teilt den StartOS-Kernel und eignet sich nur für vertrauenswürdige Workflows. Unterstützt einstellbare Parallelität und Emulation der anderen CPU-Architektur. Gitea Runner steht unter der MIT-Lizenz.',
   pl_PL:
-    'Gitea Runner wykonuje przepływy pracy Gitea Actions dla instancji Gitea na tym urządzeniu, uruchamiając każde zadanie w izolowanym, bezrootowym kontenerze OCI. Publikowane na licencji MIT.',
+    'Gitea Runner wykonuje przepływy Actions dla Gitei na tym urządzeniu. Przy dostępnym KVM zadania używają jednorazowych maszyn ze wspólną, ograniczoną pulą RAM; bez zadań nie działają żadne maszyny. Opcjonalny tryb kontenerowy współdzieli jądro StartOS i jest przeznaczony tylko dla zaufanych przepływów. Obsługuje konfigurowaną równoległość i emulację drugiej architektury CPU. Gitea Runner jest dostępny na licencji MIT.',
   fr_FR:
-    "Gitea Runner exécute les workflows Gitea Actions pour l'instance Gitea sur cet appareil, en lançant chaque tâche dans un conteneur OCI isolé et sans privilèges root. Publié sous la licence MIT.",
+    'Gitea Runner exécute les workflows Actions pour Gitea sur cet appareil. Si KVM est accessible, les tâches utilisent des VM jetables partageant une réserve de mémoire bornée ; aucun invité ne tourne au repos. Le mode conteneur facultatif partage le noyau de StartOS et convient uniquement aux workflows de confiance. Prend en charge la concurrence configurable et l’émulation de l’autre architecture CPU. Gitea Runner est publié sous licence MIT.',
 }
 
 export const dependencyDescription = {
