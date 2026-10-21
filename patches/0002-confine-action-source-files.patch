@@ -3,10 +3,10 @@ Subject: [PATCH] Confine host action reads and writes to their repository
 Retire when upstream confines metadata, synthetic files, compatibility bundles and Docker build inputs.
 
 diff --git a/act/container/docker_build.go b/act/container/docker_build.go
-index 2e072252..c55c15ad 100644
+index 2beb62ca..6853d845 100644
 --- a/act/container/docker_build.go
 +++ b/act/container/docker_build.go
-@@ -87,14 +87,19 @@ func createBuildContext(ctx context.Context, contextDir, relDockerfile string) (
+@@ -90,14 +90,19 @@ func createBuildContext(ctx context.Context, contextDir, relDockerfile string) (
  	// And canonicalize dockerfile name to a platform-independent one
  	relDockerfile = filepath.ToSlash(relDockerfile)
  
@@ -85,18 +85,18 @@ index 00000000..180f7d80
 +	}
 +}
 diff --git a/act/runner/action.go b/act/runner/action.go
-index 8be1cc32..bf4159f8 100644
+index dee56e54..2c173654 100644
 --- a/act/runner/action.go
 +++ b/act/runner/action.go
 @@ -153,7 +153,7 @@ func maybeCopyToActionDir(ctx context.Context, step actionStep, actionDir, actio
  
  	if !rc.Config.NoActionPatch {
- 		// A concurrent job's prepare resets this directory, so patch under the copy's lock.
+ 		// Other jobs share the directory, so patch under the copy's lock.
 -		defer patchActions(ctx, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
 +		defer patchActions(ctx, actionDir, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
  	}
  
- 	return rc.JobContainer.CopyDir(containerActionDirCopy, actionDir+"/", rc.Config.UseGitIgnore, true)(ctx)
+ 	return rc.JobContainer.CopyDir(containerActionDirCopy, actionDir+"/", false, true)(ctx) // an exported commit has no .git to apply gitignore with
 @@ -306,6 +306,17 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
  	} else {
  		image = rc.dockerActionImage(ctx, step, actionName, localAction)
@@ -171,10 +171,10 @@ index 00000000..7b400668
 +}
 diff --git a/act/runner/action_source_test.go b/act/runner/action_source_test.go
 new file mode 100644
-index 00000000..115c5150
+index 00000000..6e33944b
 --- /dev/null
 +++ b/act/runner/action_source_test.go
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,121 @@
 +// Copyright 2026 The Gitea Authors. All rights reserved.
 +// SPDX-License-Identifier: MIT
 +
@@ -186,7 +186,6 @@ index 00000000..115c5150
 +	"path/filepath"
 +	"testing"
 +
-+	"gitea.com/gitea/runner/act/common"
 +	"gitea.com/gitea/runner/act/common/git"
 +
 +	"gitea.dev/actionslib/pkg/model"
@@ -199,17 +198,15 @@ index 00000000..115c5150
 +			outside := filepath.Join(t.TempDir(), "controller-secret")
 +			metadata := []byte("name: fixture\nruns:\n  using: node20\n  main: index.js\n")
 +			require.NoError(t, os.WriteFile(outside, metadata, 0o600))
-+			setCloneExecutor(t, func(input git.NewGitCloneExecutorInput) common.Executor {
-+				return func(context.Context) error {
-+					directory := filepath.Join(input.Dir, "action")
-+					if err := os.MkdirAll(directory, 0o700); err != nil {
-+						return err
-+					}
-+					if target == "regular" {
-+						return os.WriteFile(filepath.Join(directory, "action.yml"), metadata, 0o600)
-+					}
-+					return os.Symlink(outside, filepath.Join(directory, target))
++			setFetch(t, func(_ context.Context, input git.NewGitCloneExecutorInput) (string, string, error) {
++				directory := filepath.Join(input.Dir, "action")
++				if err := os.MkdirAll(directory, 0o700); err != nil {
++					return "", "", err
 +				}
++				if target == "regular" {
++					return input.Dir, "", os.WriteFile(filepath.Join(directory, "action.yml"), metadata, 0o600)
++				}
++				return input.Dir, "", os.Symlink(outside, filepath.Join(directory, target))
 +			})
 +			sar := &stepActionRemote{
 +				Step: &model.Step{Uses: "org/repo/action@v1", With: map[string]string{"args": "echo fixture"}},
@@ -300,10 +297,10 @@ index 00000000..115c5150
 +	require.Equal(t, gateTSC, string(contents))
 +}
 diff --git a/act/runner/action_test.go b/act/runner/action_test.go
-index 94222d59..0ad58334 100644
+index 795dd70d..fe5c9afd 100644
 --- a/act/runner/action_test.go
 +++ b/act/runner/action_test.go
-@@ -403,6 +403,7 @@ func TestMaybeCopyToActionDirHoldsCloneLock(t *testing.T) {
+@@ -406,6 +406,7 @@ func TestMaybeCopyToActionDirHoldsCloneLock(t *testing.T) {
  
  func TestExecAsDockerHoldsCloneLockForRemoteUncached(t *testing.T) {
  	actionDir := t.TempDir()
@@ -380,7 +377,7 @@ index c82f75d7..8ec6d327 100644
  
  // patchedBundle opens the GHES gate, and where the cache toolkit is present, points the cache
 diff --git a/act/runner/patch_actions_e2e_test.go b/act/runner/patch_actions_e2e_test.go
-index 5a8d14cc..d9affedd 100644
+index f824866c..8658998d 100644
 --- a/act/runner/patch_actions_e2e_test.go
 +++ b/act/runner/patch_actions_e2e_test.go
 @@ -116,7 +116,7 @@ func patchedAction(t *testing.T, repo, ref, entrypoint string) string {
@@ -393,7 +390,7 @@ index 5a8d14cc..d9affedd 100644
  }
  
 diff --git a/act/runner/patch_actions_test.go b/act/runner/patch_actions_test.go
-index bc7e8e4f..3e8d16e8 100644
+index 8d194b3c..f48f2702 100644
 --- a/act/runner/patch_actions_test.go
 +++ b/act/runner/patch_actions_test.go
 @@ -175,15 +175,18 @@ func TestPatchedBundleSurvivesInsideAStringLiteral(t *testing.T) {
@@ -431,7 +428,7 @@ index bc7e8e4f..3e8d16e8 100644
  	assert.Nil(t, original)
  	body, err := os.ReadFile(script)
 diff --git a/act/runner/step_action_local.go b/act/runner/step_action_local.go
-index ec715f8f..e7214e05 100644
+index ad02e981..fef89fcb 100644
 --- a/act/runner/step_action_local.go
 +++ b/act/runner/step_action_local.go
 @@ -16,6 +16,7 @@ import (
@@ -442,13 +439,14 @@ index ec715f8f..e7214e05 100644
  
  	"gitea.dev/actionslib/pkg/model"
  )
-@@ -80,7 +81,15 @@ func (sal *stepActionLocal) main() common.Executor {
+@@ -80,7 +81,16 @@ func (sal *stepActionLocal) main() common.Executor {
  			return nil, nil, fmt.Errorf("max depth %d of symlinks exceeded while reading %s", maxSymlinkDepth, spath)
  		}
  
 -		actionModel, err := sal.readAction(ctx, sal.Step, actionDir, "", localReader, os.WriteFile)
 +		localWriter := func(filename string, data []byte, mode fs.FileMode) error {
-+			_, destination := getContainerActionPaths(sal.Step, filepath.Dir(filename), sal.RunContext)
++			rc := sal.RunContext
++			destination := rc.JobContainer.ToContainerPath(rc.Config.Workdir) + "/" + getOsSafeRelativePath(filepath.Dir(filename), rc.Config.Workdir)
 +			return sal.RunContext.JobContainer.Copy(destination, &container.FileEntry{
 +				Name: filepath.Base(filename),
 +				Mode: int64(mode),
@@ -536,54 +534,52 @@ index b6c09497..0afe5828 100644
  	salm.AssertExpectations(t)
  }
 diff --git a/act/runner/step_action_remote.go b/act/runner/step_action_remote.go
-index d13d1686..d2bfe89f 100644
+index 051dd7e2..1853d4f4 100644
 --- a/act/runner/step_action_remote.go
 +++ b/act/runner/step_action_remote.go
-@@ -101,12 +101,24 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
- 			sar.resolvedSha = sha
+@@ -102,12 +102,24 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
  		}
+ 		defer unlock()
  
-+		source, err := os.OpenRoot(actionDir)
++		source, err := os.OpenRoot(sar.actionDir)
 +		if err != nil {
 +			return err
 +		}
 +		defer source.Close()
  		remoteReader := func(filename string) (io.Reader, io.Closer, error) {
--			f, err := os.Open(filepath.Join(actionDir, sar.remoteAction.Path, filename))
+-			f, err := os.Open(filepath.Join(sar.actionDir, sar.remoteAction.Path, filename))
 +			f, err := source.Open(filepath.Join(sar.remoteAction.Path, filename))
  			return f, f, err
  		}
 +		remoteWriter := func(filename string, data []byte, mode os.FileMode) error {
-+			relative, err := filepath.Rel(actionDir, filename)
++			relative, err := filepath.Rel(sar.actionDir, filename)
 +			if err != nil {
 +				return err
 +			}
 +			return source.WriteFile(relative, data, mode)
 +		}
  
--		actionModel, err := sar.readAction(ctx, sar.Step, actionDir, sar.remoteAction.Path, remoteReader, os.WriteFile)
-+		actionModel, err := sar.readAction(ctx, sar.Step, actionDir, sar.remoteAction.Path, remoteReader, remoteWriter)
+-		actionModel, err := sar.readAction(ctx, sar.Step, sar.actionDir, sar.remoteAction.Path, remoteReader, os.WriteFile)
++		actionModel, err := sar.readAction(ctx, sar.Step, sar.actionDir, sar.remoteAction.Path, remoteReader, remoteWriter)
  		sar.action = actionModel
  		return err
  	}
 diff --git a/act/runner/step_action_remote_test.go b/act/runner/step_action_remote_test.go
-index 95b0fcc2..340bd432 100644
+index 1c40368c..b60af700 100644
 --- a/act/runner/step_action_remote_test.go
 +++ b/act/runner/step_action_remote_test.go
-@@ -37,7 +37,15 @@ func actionDirSuffix(suffix string) any {
+@@ -34,7 +34,13 @@ type stepActionRemoteMocks struct {
  
- func setCloneExecutor(t *testing.T, executor func(git.NewGitCloneExecutorInput) common.Executor) {
- 	original := stepActionRemoteNewCloneExecutor
--	stepActionRemoteNewCloneExecutor = executor
-+	stepActionRemoteNewCloneExecutor = func(input git.NewGitCloneExecutorInput) common.Executor {
-+		clone := executor(input)
-+		return func(ctx context.Context) error {
-+			if err := clone(ctx); err != nil {
-+				return err
-+			}
-+			return os.MkdirAll(input.Dir, 0o755)
+ func setFetch(t *testing.T, fetch func(context.Context, git.NewGitCloneExecutorInput) (string, string, error)) {
+ 	original := stepActionRemoteFetch
+-	stepActionRemoteFetch = fetch
++	stepActionRemoteFetch = func(ctx context.Context, input git.NewGitCloneExecutorInput) (string, string, error) {
++		dir, sha, err := fetch(ctx, input)
++		if err != nil {
++			return dir, sha, err
 +		}
++		return dir, sha, os.MkdirAll(dir, 0o755)
 +	}
- 	t.Cleanup(func() { stepActionRemoteNewCloneExecutor = original })
+ 	t.Cleanup(func() { stepActionRemoteFetch = original })
  }
  
