@@ -1,93 +1,153 @@
 #!/bin/bash
-# Orchestrates a rootless Podman engine + the Gitea Actions runner (gitea-runner)
-# inside the service container. main.ts passes the forge connection via the env.
 set -euo pipefail
+umask 077
 
-: "${INSTANCE_URL:=}"
-: "${RUNNER_TOKEN:=}"
+: "${INSTANCE_URL:?}"
+: "${RUNNER_LABELS:?}"
+: "${RUNNER_REGISTRATION_DIR:?}"
+: "${RUNNER_REGISTRATION_REVISION:=0}"
+: "${RUNNER_REGISTRATION_PENDING:=false}"
 : "${RUNNER_NAME:=startos-runner}"
-: "${RUNNER_LABELS:=}"
 : "${RUNNER_CAPACITY:=1}"
 
-# App-owned working area (chowned by the own-data oneshot); StartOS's own
-# store.json stays at /data and is left untouched.
-DATA=/data/runner
-CONFIG="$DATA/config.yaml"
-# `register` writes its state file (.runner) into the working directory.
-cd "$DATA"
+IFS=',' read -ra label_list <<< "$RUNNER_LABELS"
+ORIGINAL="$RUNNER_REGISTRATION_DIR/.runner"
+RECEIPT=${RUNNER_REGISTRATION_RECEIPT:-}
 
-# Podman needs a writable XDG_RUNTIME_DIR for its socket + transient state.
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/data/runner/run}"
-mkdir -p "$XDG_RUNTIME_DIR/podman" "$XDG_RUNTIME_DIR/containers" "$DATA/containers/storage"
-chmod 700 "$XDG_RUNTIME_DIR"
-SOCK="$XDG_RUNTIME_DIR/podman/podman.sock"
+valid_registration() {
+  [ -f "$1" ] && [ ! -L "$1" ] && jq -e '
+    (.uuid | type == "string" and length > 0) and
+    (.token | type == "string" and length > 0) and
+    ((.ephemeral // false) == false)
+  ' "$1" >/dev/null 2>&1
+}
 
-# Bring up the Podman API socket (docker-compatible) the runner drives. Layer
-# store lives on the data volume so job images survive restarts;
-# --cgroup-manager=cgroupfs because there's no user systemd session here.
-podman --root "$DATA/containers/storage" --runroot "$XDG_RUNTIME_DIR/containers" \
-       --cgroup-manager=cgroupfs system service -t 0 "unix://$SOCK" &
-export DOCKER_HOST="unix://$SOCK"
+identity_config() {
+  local config=$1 registration=$2
+  gitea-runner --config "$config" config init --force
+  gitea-runner --config "$config" config set runner.file "$registration"
+  gitea-runner --config "$config" config set runner.labels "${label_list[@]}"
+  gitea-runner --config "$config" config set runner.env_file ''
+}
 
-# Wait until the Podman API actually answers — not just the socket file
-# appearing — so the runner daemon doesn't race a half-up socket.
-for _ in $(seq 1 60); do
-  podman --remote --url "unix://$SOCK" info >/dev/null 2>&1 && break
-  sleep 1
-done
+publish_registration() {
+  local staged=$1
+  cp --remove-destination "$staged" "$ORIGINAL.tmp"
+  mv -f "$ORIGINAL.tmp" "$ORIGINAL"
+  printf '%s\n' "$RUNNER_REGISTRATION_REVISION" > "$RECEIPT.tmp"
+  mv -f "$RECEIPT.tmp" "$RECEIPT"
+  rm -f "$staged" "$staged.lock"
+}
 
-# gitea-runner reads runner labels from config.yaml. Rewrite the config each
-# start so the Configure action's labels take effect; every key left unset keeps
-# gitea-runner's own default.
-gitea-runner --config "$CONFIG" config init --force
-# `config init` writes a minimal file with no capacity key, so this must be a
-# `config set` — a sed over the generated config has nothing to match.
-gitea-runner --config "$CONFIG" config set runner.capacity "$RUNNER_CAPACITY"
-IFS=',' read -ra RUNNER_LABEL_LIST <<<"$RUNNER_LABELS"
-for label in "${RUNNER_LABEL_LIST[@]}"; do
-  label="$(printf '%s' "$label" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-  [ -n "$label" ] && gitea-runner --config "$CONFIG" config add runner.labels "$label"
-done
-
-# Register exactly once; the .runner state file makes this idempotent.
-if [ ! -f "$DATA/.runner" ]; then
-  if [ -n "$INSTANCE_URL" ] && [ -n "$RUNNER_TOKEN" ]; then
-    echo "Registering runner '$RUNNER_NAME' with $INSTANCE_URL ..."
-    if ! gitea-runner register --no-interactive \
-      --instance "$INSTANCE_URL" --token "$RUNNER_TOKEN" \
-      --name "$RUNNER_NAME" --config "$CONFIG"; then
-      echo "gitea-runner: registration with $INSTANCE_URL failed. Run the 'Configure'" \
-           "action with a fresh registration token, then restart this service." >&2
-      exec sleep infinity
+register_identity() {
+  : "${RUNNER_REGISTRATION_RECEIPT:?}"
+  [[ "$RUNNER_REGISTRATION_REVISION" =~ ^(0|[1-9][0-9]*)$ ]]
+  case "$RUNNER_REGISTRATION_PENDING" in true|false) ;; *) exit 1;; esac
+  mkdir -p "$RUNNER_REGISTRATION_DIR"
+  chmod 700 "$RUNNER_REGISTRATION_DIR"
+  exec 9> "$ORIGINAL.lock"
+  flock -x 9
+  local staged="$RUNNER_REGISTRATION_DIR/.runner.pending-$RUNNER_REGISTRATION_REVISION"
+  local config="$RUNNER_REGISTRATION_DIR/registration-config.yaml"
+  local receipt
+  receipt=$(cat "$RECEIPT" 2>/dev/null || true)
+  if [ "$RUNNER_REGISTRATION_PENDING" = true ] && [ "$receipt" != "$RUNNER_REGISTRATION_REVISION" ]; then
+    if ! valid_registration "$staged"; then
+      : "${RUNNER_TOKEN:?A fresh Gitea registration token is required}"
+      rm -f "$staged"
+      identity_config "$config" "$staged"
+      gitea-runner --config "$config" register --no-interactive \
+        --instance "$INSTANCE_URL" --token "$RUNNER_TOKEN" --name "$RUNNER_NAME"
+      valid_registration "$staged"
     fi
-  else
-    echo "gitea-runner: not configured. Run the 'Configure' action to set a" \
-         "registration token, then restart this service." >&2
-    # Stay alive so the health check can report 'needs config' instead of crash-looping.
-    exec sleep infinity
+    publish_registration "$staged"
+  elif ! valid_registration "$ORIGINAL" && [ "$receipt" = "$RUNNER_REGISTRATION_REVISION" ] && valid_registration "$staged"; then
+    publish_registration "$staged"
   fi
-fi
+  if ! valid_registration "$ORIGINAL"; then
+    echo 'gitea-runner: a persistent registration is required; use Configure with a fresh token.' >&2
+    return 1
+  fi
+  rm -f "$config" "$staged" "$staged.lock"
+}
 
-# The daemon dials the address saved at registration, which goes stale when Gitea's bridge port changes.
-sed -i "s|\"address\": \"[^\"]*\"|\"address\": \"$INSTANCE_URL\"|" "$DATA/.runner"
-
-LOG="$DATA/run/daemon.log"
-exec 3> >(tee "$LOG")
-tee_pid=$!
-gitea-runner daemon --config "$CONFIG" >&3 2>&1 &
-pid=$!
-exec 3>&-
-trap 'kill -TERM "$pid" 2>/dev/null' TERM INT
-status=0
-wait "$pid" || status=$?
-while kill -0 "$pid" 2>/dev/null; do status=0; wait "$pid" || status=$?; done
-wait "$tee_pid" || true
-
-# Gitea answers "unregistered runner" once its database no longer holds this registration.
-if grep -qE '^Error: ([a-z_]+: )?(unregistered runner|runner is no longer registered with the server; please register it again)$' "$LOG"; then
-  rm -f "$DATA/.runner"
-  echo "gitea-runner: Gitea no longer recognizes this runner. Run the 'Configure'" \
-       "action with a fresh registration token, then restart this service." >&2
+wait_for_registration() {
+  echo 'gitea-runner: Gitea no longer recognizes this identity; use Configure with a fresh registration token.' >&2
   exec sleep infinity
-fi
-exit "$status"
+}
+
+run_controller() {
+  : "${DOCKER_HOST:?}"
+  : "${RUNNER_SCRATCH_DIR:?}"
+  : "${RUNNER_DEFAULT_IMAGE:?}"
+  local data=/data/runner config=/data/runner/config.yaml snapshot=/data/runner/.runner
+  test "$ORIGINAL" != "$snapshot"
+  mkdir -p "$data/run"
+  exec 9< "$ORIGINAL.lock"
+  flock -s 9
+  valid_registration "$ORIGINAL"
+  jq --arg address "$INSTANCE_URL" '.address = $address' "$ORIGINAL" > "$snapshot.tmp"
+  mv -f "$snapshot.tmp" "$snapshot"
+  local uuid rejected="$data/rejected-uuid"
+  uuid=$(jq -er .uuid "$snapshot")
+  if [ "$(cat "$rejected" 2>/dev/null || true)" = "$uuid" ]; then
+    wait_for_registration
+  fi
+  rm -f "$rejected"
+  identity_config "$config" "$snapshot"
+  gitea-runner --config "$config" config set runner.capacity "$RUNNER_CAPACITY"
+  gitea-runner --config "$config" config set runner.default_image "$RUNNER_DEFAULT_IMAGE"
+  gitea-runner --config "$config" config set runner.client_cert_file ''
+  gitea-runner --config "$config" config set runner.client_key_file ''
+  gitea-runner --config "$config" config set host.workdir_parent /tmp/runner-actions
+  gitea-runner --config "$config" config set cache.enabled false
+  gitea-runner --config "$config" config set container.require_docker true
+  gitea-runner --config "$config" config set container.privileged true
+  gitea-runner --config "$config" config set container.docker_host "$DOCKER_HOST"
+  if [ -n "${RUNNER_BEFORE_JOB:-}" ]; then
+    gitea-runner --config "$config" config set runner.before_job "$RUNNER_BEFORE_JOB"
+  fi
+  local hosts options
+  hosts=$(jq -er 'if type != "array" or any(.[]; type != "string" or (test("^[A-Za-z0-9][A-Za-z0-9.-]*:[0-9.]+$") | not)) then error("Invalid local host mapping") else map(" --add-host " + .) | join("") end' <<< "${RUNNER_LOCAL_HOSTS:-[]}")
+  options="--volume $RUNNER_SCRATCH_DIR:/root/setup-docker-action --volume /etc/resolv.conf:/etc/resolv.conf:ro$hosts"
+  local -a volumes=("$RUNNER_SCRATCH_DIR" /etc/resolv.conf)
+  if [[ "$DOCKER_HOST" = tcp://* ]]; then
+    options+=' --volume /var/run/docker.sock:/var/run/docker.sock'
+    volumes+=(/var/run/docker.sock)
+  fi
+  gitea-runner --config "$config" config set container.options "$options"
+  gitea-runner --config "$config" config set container.valid_volumes "${volumes[@]}"
+  source /usr/local/libexec/runner-docker-client.sh
+  cd "$data"
+  local log="$data/run/daemon.log" pid tee_pid status=0
+  exec 3> >(tee "$log")
+  tee_pid=$!
+  gitea-runner --config "$config" "$@" >&3 2>&1 &
+  pid=$!
+  exec 3>&-
+  trap 'kill -TERM "$pid" 2>/dev/null || true' TERM INT
+  wait "$pid" || status=$?
+  while kill -0 "$pid" 2>/dev/null; do status=0; wait "$pid" || status=$?; done
+  wait "$tee_pid" || true
+  if grep -qE '^Error: ([a-z_]+: )?(unregistered runner|runner is no longer registered with the server; please register it again)$' "$log"; then
+    printf '%s\n' "$uuid" > "$rejected"
+    wait_for_registration
+  fi
+  return "$status"
+}
+
+case "${1:-daemon}" in
+  register)
+    [ "$#" -eq 1 ]
+    register_identity
+    ;;
+  one-job)
+    [ "$#" -eq 2 ] && [ "$2" = --wait ]
+    run_controller daemon --once
+    ;;
+  daemon)
+    [ "$#" -le 1 ]
+    run_controller daemon
+    ;;
+  *) echo 'Unsupported runner adapter mode' >&2; exit 1;;
+esac
