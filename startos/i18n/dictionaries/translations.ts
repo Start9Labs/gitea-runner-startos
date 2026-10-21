@@ -50,7 +50,7 @@ export default {
     '45': 'Listo para un trabajo; sin máquina virtual asignada',
     '46': 'Preparando una máquina virtual desechable',
     '47': 'Ejecutando un trabajo',
-    '48': 'La virtualización está activada, pero KVM no está disponible. Restablezca el acceso a KVM y reinicie el servicio, o use Configurar para seleccionar explícitamente el modo contenedor.',
+    '48': 'La virtualización está activada, pero KVM no está disponible. Restablezca el acceso a KVM y guarde Configurar con Virtualización activada, o use Configurar para seleccionar explícitamente el modo contenedor.',
   },
   de_DE: {
     '0': 'Dieses Gerät erfüllt nicht die Mindestanforderungen für CI-Jobs (1,5 GiB RAM und 2 CPU-Kerne).',
@@ -101,7 +101,7 @@ export default {
     '45': 'Bereit für einen Job; keine VM zugewiesen',
     '46': 'Eine wegwerfbare VM wird vorbereitet',
     '47': 'Ein Job wird ausgeführt',
-    '48': 'Virtualisierung ist aktiviert, aber KVM ist nicht verfügbar. Stellen Sie den KVM-Zugriff wieder her und starten Sie den Dienst neu, oder wählen Sie unter Konfigurieren ausdrücklich den Containermodus.',
+    '48': 'Virtualisierung ist aktiviert, aber KVM ist nicht verfügbar. Stellen Sie den KVM-Zugriff wieder her und speichern Sie Konfigurieren mit aktivierter Virtualisierung, oder wählen Sie unter Konfigurieren ausdrücklich den Containermodus.',
   },
   pl_PL: {
     '0': 'Urządzenie nie spełnia minimalnych wymagań CI (1,5 GiB RAM i 2 rdzenie CPU).',
@@ -152,7 +152,7 @@ export default {
     '45': 'Gotowość do zadania; brak przydzielonej maszyny',
     '46': 'Przygotowywanie jednorazowej maszyny wirtualnej',
     '47': 'Wykonywanie zadania',
-    '48': 'Wirtualizacja jest włączona, ale KVM jest niedostępne. Przywróć dostęp do KVM i uruchom usługę ponownie lub jawnie wybierz tryb kontenerowy w akcji Konfiguruj.',
+    '48': 'Wirtualizacja jest włączona, ale KVM jest niedostępne. Przywróć dostęp do KVM i zapisz akcję Konfiguruj z włączoną wirtualizacją lub jawnie wybierz tryb kontenerowy w akcji Konfiguruj.',
   },
   fr_FR: {
     '0': 'Cet appareil ne répond pas aux exigences minimales CI (1,5 Gio de RAM et 2 cœurs CPU).',
@@ -203,6 +203,6 @@ export default {
     '45': 'Prêt pour une tâche ; aucune VM allouée',
     '46': 'Préparation d’une VM jetable',
     '47': 'Exécution d’une tâche',
-    '48': 'La virtualisation est activée, mais KVM est indisponible. Rétablissez l’accès à KVM et redémarrez le service, ou choisissez explicitement le mode conteneur avec Configurer.',
+    '48': 'La virtualisation est activée, mais KVM est indisponible. Rétablissez l’accès à KVM et enregistrez Configurer avec la virtualisation activée, ou choisissez explicitement le mode conteneur avec Configurer.',
   },
 } satisfies Record<string, LangDict>

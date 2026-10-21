@@ -49,7 +49,7 @@ const dict = {
   'Ready for a job; no VM allocated': 45,
   'Preparing a disposable VM': 46,
   'Running a job': 47,
-  'Virtualization is enabled but KVM is unavailable. Restore KVM access and restart the service, or run Configure to explicitly select container mode.': 48,
+  'Virtualization is enabled but KVM is unavailable. Restore KVM access and save Configure with Virtualization on, or run Configure to explicitly select container mode.': 48,
 }
 
 export type I18nKey = keyof typeof dict
