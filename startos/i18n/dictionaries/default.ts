@@ -27,7 +27,7 @@ const dict = {
   'Also serve jobs for the other CPU architecture, run under emulation (much slower than native). Appends a foreign-architecture label pinned to that platform; prefer a native runner per architecture for regular builds.': 23,
   Virtualization: 24,
   'Run each job in a disposable VM with its own guest kernel. Container mode starts faster and uses less memory, but shares the StartOS kernel. VM failures do not switch to container mode.': 25,
-  'KVM hardware virtualization is unavailable on this device. Jobs run in containers that share the StartOS kernel.': 26,
+  'KVM is unavailable. Save with Virtualization off to explicitly use containers that share the StartOS kernel.': 26,
   'Changing the runner name requires a fresh registration token.': 27,
   'A fresh registration token is required to register this runner.': 28,
   'Too many concurrent jobs: each VM needs at least 512 MiB of guest RAM.': 29,
@@ -49,6 +49,7 @@ const dict = {
   'Ready for a job; no VM allocated': 45,
   'Preparing a disposable VM': 46,
   'Running a job': 47,
+  'Virtualization is enabled but KVM is unavailable. Restore KVM access and restart the service, or run Configure to explicitly select container mode.': 48,
 }
 
 export type I18nKey = keyof typeof dict

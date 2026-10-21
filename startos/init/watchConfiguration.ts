@@ -8,6 +8,7 @@ import {
   registrationPending,
   registrationUsable,
   runnerLabels,
+  runnerBackend,
   virtualizationAvailable,
   vmResources,
   vmDiskSize,
@@ -31,7 +32,12 @@ export const watchConfiguration = sdk.setupOnInit(async (effects) => {
   }
   try {
     runnerLabels(store)
-    if (store.virtualization && (await virtualizationAvailable(effects))) {
+    if (
+      runnerBackend(
+        store.virtualization,
+        await virtualizationAvailable(effects),
+      ) === 'vm'
+    ) {
       vmResources(store.capacity)
       await vmDiskSize(effects, store.capacity)
     }

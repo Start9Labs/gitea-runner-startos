@@ -40,7 +40,7 @@ A custom Debian image builds the pinned upstream source with package patches. Th
 | `vm-image-preparation` | Downloads and prepares the guest base on virtualized startup |
 | `vm-memory-pool` | Brokers aggregate guest RAM independently of worker lifetime |
 | `vm-worker-N` | One host-side poller and disposable guest lifecycle per configured slot |
-| `container-engine` | Rootful Docker backend when virtualization is disabled or KVM is unavailable |
+| `container-engine` | Rootful Docker backend when virtualization is explicitly disabled |
 | `runner-controller` | One native daemon with configured assignment capacity in container mode |
 
 The controller, preparer and nested engine commands run as root inside the service. The image supports x86_64 and aarch64, includes Git/OpenSSH, and uses filesystem and KVM grants, not a TUN device. KVM is probed by opening its device. Once VM execution is selected, boot or provisioning errors fail the assignment rather than retrying it as a container or using TCG.
@@ -96,7 +96,7 @@ The public StartOS root CA is installed in controllers, preparers and engines. J
 
 ## Installation and First-Run Flow
 
-Init seeds settings with a hardware-aware virtualization default. The service requires at least two visible CPU cores and 1.5 GiB of service-visible memory; VM admission additionally validates capacity against the memory floor and scratch budget.
+Init seeds settings with a hardware-aware virtualization default. New settings use container mode without accessible KVM. If virtualization is already enabled and KVM becomes unavailable, a critical Configure task blocks startup and main refuses to create either backend. Restore KVM access and restart, or explicitly save Configure with Virtualization off to use containers. The saved choice and registration are not automatically changed; the task clears when the selected backend is usable. The service requires at least two visible CPU cores and 1.5 GiB of service-visible memory; VM admission additionally validates capacity against the memory floor and scratch budget.
 
 Registration completes before controllers poll. Guest-image preparation runs before virtualized workers start and is cached by image, architecture, provisioning inputs and public CA fingerprint. Preparation can take several minutes. A restarted idle slot launches only its poller, not an idle guest.
 

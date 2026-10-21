@@ -31,6 +31,7 @@ import {
   registrationUsable,
   registrationHealth,
   runnerLabels,
+  runnerBackend,
   virtualizationAvailable,
   vmResources,
   vmDiskSize,
@@ -74,6 +75,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     )
   }
   const available = await virtualizationAvailable(effects)
+  const backend = runnerBackend(store.virtualization, available)
   const rootCa = await sdk.getRootCa(effects)
   const osIp = await sdk.getOsIp(effects)
   const localHosts = await sdk.host
@@ -131,7 +133,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     requires: [],
   })
 
-  if (!store.virtualization || !available) {
+  if (backend === 'container') {
     const controllerPath = './controller/container'
     const engine = sdk.SubContainer.of(
       effects,

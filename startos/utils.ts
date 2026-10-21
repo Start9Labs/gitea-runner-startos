@@ -5,6 +5,7 @@ import {
   guestDiskGiB,
   guestResources,
   resolveRunnerLabels,
+  resolveRunnerBackend,
 } from 'forgejo-runner-startos/runtime'
 
 export {
@@ -125,6 +126,12 @@ export function runnerLabels(
   const resolved = resolveRunnerLabels(settings)
   if (resolved.error) throw new Error(i18n(resolved.error))
   return resolved.labels
+}
+
+export function runnerBackend(virtualization: boolean, available: boolean) {
+  const resolved = resolveRunnerBackend(virtualization, available)
+  if (resolved.error) throw new Error(i18n(resolved.error))
+  return resolved.backend
 }
 
 export async function virtualizationAvailable(

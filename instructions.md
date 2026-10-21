@@ -10,7 +10,7 @@ Your runner serves **Gitea on this device**. Have Gitea running with Actions ena
 
 1. In Gitea, create a runner registration token under **Site / Organization / Repository Settings → Actions → Runners → Create new Runner**.
 2. Open **Configure** here. Paste the token and choose a runner name, labels and concurrent-job limit. The default label is `ubuntu-latest`.
-3. Leave **Virtualization** enabled when available for a separate guest kernel per assignment. Without accessible KVM, the control is disabled and jobs use containers sharing the StartOS kernel. Use container mode only for trusted workflows.
+3. Leave **Virtualization** enabled when available for a separate guest kernel per assignment. Without accessible KVM, new configurations default to containers sharing the StartOS kernel. Use container mode only for trusted workflows.
 4. Start the service. First-time VM preparation can take several minutes; watch **VM Image Preparation**. When ready, your runner appears online in Gitea.
 
 For later execution-setting changes, **leave Registration Token blank** to keep your identity. Saving Configure interrupts active jobs and restarts the runner. Supply a fresh token only to create or replace registration, including a name change. A failed replacement keeps the previous identity.
@@ -43,4 +43,4 @@ Your job image needs Git; SSH checkout also needs an SSH client. Ordinary jobs r
 
 ### Choosing container mode
 
-Disabling Virtualization reduces startup cost but removes the separate guest-kernel boundary: privileged job containers share the StartOS kernel. A VM boot or provisioning failure does not switch an assignment to container mode. Inspect the failed slot's logs before retrying.
+Disabling Virtualization reduces startup cost but removes the separate guest-kernel boundary: privileged job containers share the StartOS kernel. A VM boot or provisioning failure does not switch an assignment to container mode. If KVM becomes unavailable while Virtualization is saved as enabled, the runner stops serving jobs and raises a critical Configure task. Restore KVM access and restart the service, or save Configure with Virtualization off to explicitly permit container mode. Registration is preserved. Inspect the failed slot's logs before retrying.
