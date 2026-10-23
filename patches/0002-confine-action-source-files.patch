@@ -174,7 +174,7 @@ new file mode 100644
 index 00000000..6e33944b
 --- /dev/null
 +++ b/act/runner/action_source_test.go
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,148 @@
 +// Copyright 2026 The Gitea Authors. All rights reserved.
 +// SPDX-License-Identifier: MIT
 +
@@ -271,6 +271,33 @@ index 00000000..6e33944b
 +	}
 +}
 +
++func TestActionBundleReadWriteBoundarySymlinkedRepository(t *testing.T) {
++	cache := t.TempDir()
++	repository := filepath.Join(cache, "repository")
++	require.NoError(t, os.Mkdir(repository, 0o700))
++	linkedCache := filepath.Join(t.TempDir(), "cache")
++	require.NoError(t, os.Symlink(cache, linkedCache))
++	repository = filepath.Join(linkedCache, "repository")
++	script := filepath.Join(repository, "index.js")
++	require.NoError(t, os.WriteFile(script, []byte(gateTSC), 0o600))
++	action := &model.Action{Runs: model.ActionRuns{Using: "node20", Main: "index.js"}}
++	scripts := actionScriptPaths(repository, repository, action)
++	require.Len(t, scripts, 1)
++	canonicalScript, err := filepath.EvalSymlinks(script)
++	require.NoError(t, err)
++	require.Equal(t, canonicalScript, scripts[0])
++	func() {
++		restore := patchActions(t.Context(), repository, scripts)
++		defer restore()
++		patched, err := os.ReadFile(script)
++		require.NoError(t, err)
++		require.True(t, gateOpened(string(patched)))
++	}()
++	original, err := os.ReadFile(script)
++	require.NoError(t, err)
++	require.Equal(t, gateTSC, string(original))
++}
++
 +func TestActionBundleReadWriteBoundary(t *testing.T) {
 +	repository := t.TempDir()
 +	outside := filepath.Join(t.TempDir(), "private.js")
@@ -312,12 +339,17 @@ diff --git a/act/runner/patch_actions.go b/act/runner/patch_actions.go
 index c82f75d7..8ec6d327 100644
 --- a/act/runner/patch_actions.go
 +++ b/act/runner/patch_actions.go
-@@ -106,20 +106,31 @@ func actionScriptPaths(dir string, action *model.Action) []string {
+@@ -106,20 +106,36 @@ func actionScriptPaths(dir string, action *model.Action) []string {
  }
  
  // patchActions returns a restore: the tree is shared, so a job with patching off gets no edits.
 -func patchActions(ctx context.Context, scripts []string) func() {
 +func patchActions(ctx context.Context, repository string, scripts []string) func() {
++	repository, err := filepath.EvalSymlinks(repository)
++	if err != nil {
++		common.Logger(ctx).Warnf("actions toolkit: cannot resolve source repository: %v", err)
++		return func() {}
++	}
 +	source, err := os.OpenRoot(repository)
 +	if err != nil {
 +		common.Logger(ctx).Warnf("actions toolkit: cannot open source repository: %v", err)
@@ -348,7 +380,7 @@ index c82f75d7..8ec6d327 100644
  				common.Logger(ctx).Warnf("actions toolkit: %s left patched in the shared copy: %v", script, err)
  			}
  		}
-@@ -127,15 +138,15 @@ func patchActions(ctx context.Context, scripts []string) func() {
+@@ -127,15 +143,15 @@ func patchActions(ctx context.Context, scripts []string) func() {
  }
  
  // patchBundle returns the bytes it replaced, or nil when it left the bundle alone.
@@ -367,7 +399,7 @@ index c82f75d7..8ec6d327 100644
  	if err != nil {
  		return nil, err
  	}
-@@ -143,7 +154,7 @@ func patchBundle(script string) ([]byte, error) {
+@@ -143,7 +159,7 @@ func patchBundle(script string) ([]byte, error) {
  	if !ok {
  		return nil, nil
  	}
