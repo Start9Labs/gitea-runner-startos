@@ -11,7 +11,7 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags netgo,osusergo \
-      -ldflags '-s -w -X gitea.com/gitea/runner/internal/pkg/ver.version=v5.2.0' \
+      -ldflags '-s -w -X gitea.com/gitea/runner/internal/pkg/ver.version=v5.2.2' \
       -o /bin/gitea-runner .
 FROM $BINFMT_IMAGE AS binfmt
 

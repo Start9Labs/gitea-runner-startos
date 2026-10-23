@@ -92,8 +92,8 @@ index dee56e54..2c173654 100644
  
  	if !rc.Config.NoActionPatch {
  		// Other jobs share the directory, so patch under the copy's lock.
--		defer patchActions(ctx, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
-+		defer patchActions(ctx, actionDir, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
+-		defer patchActions(ctx, actionScriptPaths(actionDir, filepath.Join(actionDir, actionPath), step.getActionModel()))()
++		defer patchActions(ctx, actionDir, actionScriptPaths(actionDir, filepath.Join(actionDir, actionPath), step.getActionModel()))()
  	}
  
  	return rc.JobContainer.CopyDir(containerActionDirCopy, actionDir+"/", false, true)(ctx) // an exported commit has no .git to apply gitignore with
@@ -174,7 +174,7 @@ new file mode 100644
 index 00000000..6e33944b
 --- /dev/null
 +++ b/act/runner/action_source_test.go
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,148 @@
 +// Copyright 2026 The Gitea Authors. All rights reserved.
 +// SPDX-License-Identifier: MIT
 +
@@ -271,6 +271,33 @@ index 00000000..6e33944b
 +	}
 +}
 +
++func TestActionBundleReadWriteBoundarySymlinkedRepository(t *testing.T) {
++	cache := t.TempDir()
++	repository := filepath.Join(cache, "repository")
++	require.NoError(t, os.Mkdir(repository, 0o700))
++	linkedCache := filepath.Join(t.TempDir(), "cache")
++	require.NoError(t, os.Symlink(cache, linkedCache))
++	repository = filepath.Join(linkedCache, "repository")
++	script := filepath.Join(repository, "index.js")
++	require.NoError(t, os.WriteFile(script, []byte(gateTSC), 0o600))
++	action := &model.Action{Runs: model.ActionRuns{Using: "node20", Main: "index.js"}}
++	scripts := actionScriptPaths(repository, repository, action)
++	require.Len(t, scripts, 1)
++	canonicalScript, err := filepath.EvalSymlinks(script)
++	require.NoError(t, err)
++	require.Equal(t, canonicalScript, scripts[0])
++	func() {
++		restore := patchActions(t.Context(), repository, scripts)
++		defer restore()
++		patched, err := os.ReadFile(script)
++		require.NoError(t, err)
++		require.True(t, gateOpened(string(patched)))
++	}()
++	original, err := os.ReadFile(script)
++	require.NoError(t, err)
++	require.Equal(t, gateTSC, string(original))
++}
++
 +func TestActionBundleReadWriteBoundary(t *testing.T) {
 +	repository := t.TempDir()
 +	outside := filepath.Join(t.TempDir(), "private.js")
@@ -312,12 +339,17 @@ diff --git a/act/runner/patch_actions.go b/act/runner/patch_actions.go
 index c82f75d7..8ec6d327 100644
 --- a/act/runner/patch_actions.go
 +++ b/act/runner/patch_actions.go
-@@ -106,20 +106,31 @@ func actionScriptPaths(dir string, action *model.Action) []string {
+@@ -106,20 +106,36 @@ func actionScriptPaths(dir string, action *model.Action) []string {
  }
  
  // patchActions returns a restore: the tree is shared, so a job with patching off gets no edits.
 -func patchActions(ctx context.Context, scripts []string) func() {
 +func patchActions(ctx context.Context, repository string, scripts []string) func() {
++	repository, err := filepath.EvalSymlinks(repository)
++	if err != nil {
++		common.Logger(ctx).Warnf("actions toolkit: cannot resolve source repository: %v", err)
++		return func() {}
++	}
 +	source, err := os.OpenRoot(repository)
 +	if err != nil {
 +		common.Logger(ctx).Warnf("actions toolkit: cannot open source repository: %v", err)
@@ -348,7 +380,7 @@ index c82f75d7..8ec6d327 100644
  				common.Logger(ctx).Warnf("actions toolkit: %s left patched in the shared copy: %v", script, err)
  			}
  		}
-@@ -127,15 +138,15 @@ func patchActions(ctx context.Context, scripts []string) func() {
+@@ -127,15 +143,15 @@ func patchActions(ctx context.Context, scripts []string) func() {
  }
  
  // patchBundle returns the bytes it replaced, or nil when it left the bundle alone.
@@ -367,7 +399,7 @@ index c82f75d7..8ec6d327 100644
  	if err != nil {
  		return nil, err
  	}
-@@ -143,7 +154,7 @@ func patchBundle(script string) ([]byte, error) {
+@@ -143,7 +159,7 @@ func patchBundle(script string) ([]byte, error) {
  	if !ok {
  		return nil, nil
  	}
@@ -388,6 +420,15 @@ index f824866c..8658998d 100644
 +	t.Cleanup(patchActions(t.Context(), filepath.Dir(script), []string{script}))
  	return script
  }
+ 
+@@ -327,7 +327,7 @@ func TestRustCacheSplitBundleEndToEnd(t *testing.T) {
+ 	}
+ 	t.Setenv("CARGO_HOME", tempDirPath(t))
+ 
+-	defer patchActions(t.Context(), actionScriptPaths(dir, dir, action))()
++	defer patchActions(t.Context(), dir, actionScriptPaths(dir, dir, action))()
+ 	out := runActionEntrypoint(t, filepath.Join(dir, action.Runs.Main),
+ 		newActionJobEnv(t, "split-runtime-token", artifactcache.JobCredential{Repo: "testuser/testrepo"}), inputs)
  
 diff --git a/act/runner/patch_actions_test.go b/act/runner/patch_actions_test.go
 index 8d194b3c..f48f2702 100644
@@ -461,7 +502,7 @@ diff --git a/act/runner/step_action_local_test.go b/act/runner/step_action_local
 index b6c09497..0afe5828 100644
 --- a/act/runner/step_action_local_test.go
 +++ b/act/runner/step_action_local_test.go
-@@ -8,15 +8,18 @@ import (
+@@ -8,11 +8,13 @@ import (
  	"bytes"
  	"context"
  	"io"
@@ -475,12 +516,7 @@ index b6c09497..0afe5828 100644
  
  	"gitea.dev/actionslib/pkg/model"
  	"github.com/stretchr/testify/assert"
- 	"github.com/stretchr/testify/mock"
-+	"github.com/stretchr/testify/require"
- 	"go.yaml.in/yaml/v4"
- )
- 
-@@ -36,6 +39,9 @@ func (salm *stepActionLocalMocks) readAction(_ context.Context, step *model.Step
+@@ -45,6 +47,9 @@ func expectStepFileCommands(t *testing.T, cm *containerMock) {
  
  func TestStepActionLocalTest(t *testing.T) {
  	ctx := t.Context()
@@ -489,8 +525,8 @@ index b6c09497..0afe5828 100644
 +	require.NoError(t, os.MkdirAll(actionDir, 0o700))
  
  	cm := &containerMock{}
- 	salm := &stepActionLocalMocks{}
-@@ -47,7 +53,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 	salm := &stepActionMocks{}
+@@ -56,7 +61,7 @@ func TestStepActionLocalTest(t *testing.T) {
  			StepResults: map[string]*model.StepResult{},
  			ExprEval:    &expressionEvaluator{},
  			Config: &Config{
@@ -499,10 +535,7 @@ index b6c09497..0afe5828 100644
  			},
  			Run: &model.Run{
  				JobID: "1",
-@@ -71,8 +77,14 @@ func TestStepActionLocalTest(t *testing.T) {
- 		},
- 	}
- 
+@@ -77,16 +82,23 @@ func TestStepActionLocalTest(t *testing.T) {
 -	salm.On("readAction", sal.Step, filepath.Clean("/tmp/path/to/action"), "", mock.Anything, mock.Anything).
 -		Return(&model.Action{}, nil)
 +	salm.On("readAction", sal.Step, actionDir, "", mock.Anything, mock.Anything).
@@ -514,25 +547,22 @@ index b6c09497..0afe5828 100644
 +		return len(files) == 1 && files[0].Name == "trampoline.js" && files[0].Body == "fixture" && files[0].Mode == 0o400
 +	})).Return(noopExecutor).Once()
  
- 	cm.On("Copy", "/var/run/act", mock.AnythingOfType("[]*container.FileEntry")).Return(noopExecutor)
- 
-@@ -84,7 +96,7 @@ func TestStepActionLocalTest(t *testing.T) {
- 
- 	cm.On("GetContainerArchive", ctx, "/var/run/act/workflow/pathcmd.txt").Return(io.NopCloser(&bytes.Buffer{}), nil)
+ 	expectStepFileCommands(t, cm)
  
 -	salm.On("runAction", sal, filepath.Clean("/tmp/path/to/action"), (*remoteAction)(nil)).Return(noopExecutor)
 +	salm.On("runAction", sal, actionDir, (*remoteAction)(nil)).Return(noopExecutor)
  
  	err := sal.pre()(ctx)
- 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
-@@ -92,6 +104,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 	require.NoError(t, err)
+ 
  	err = sal.main()(ctx)
- 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+ 	require.NoError(t, err)
  
 +	require.NoFileExists(t, filepath.Join(actionDir, "trampoline.js"))
  	cm.AssertExpectations(t)
  	salm.AssertExpectations(t)
  }
+
 diff --git a/act/runner/step_action_remote.go b/act/runner/step_action_remote.go
 index 051dd7e2..1853d4f4 100644
 --- a/act/runner/step_action_remote.go
