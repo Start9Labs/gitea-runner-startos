@@ -23,8 +23,8 @@ index 13a16564..7117d5a1 100644
  				pipeline = append(pipeline, func(ctx context.Context) error {
  					defer jobMutexes.Delete(job)
  					return stageParallel(ctx)
-@@ -331,7 +332,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
- 			}
+@@ -318,7 +319,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
+ 			parallelism = min(parallelism, len(pipeline))
  
  			logging.Infof("Executing %d pipeline elements with parallelism %d", len(pipeline), parallelism)
 -			return common.NewParallelExecutor(parallelism, pipeline...)(ctx)
@@ -32,10 +32,11 @@ index 13a16564..7117d5a1 100644
  		})
  	}
  
-@@ -339,6 +340,13 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
- 	return func(ctx context.Context) error { return executor(ghcontext.WithPinnedCheckout(ctx)) }
+@@ -325,6 +326,13 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
+ 		return executor(container.WithRunnerArch(ghcontext.WithPinnedCheckout(ctx)))
+ 	}
  }
- 
+
 +func (runner *runnerImpl) parallelJobExecutor(parallel int, executors ...common.Executor) common.Executor {
 +	if runner.config.SerialJobs {
 +		parallel = 1

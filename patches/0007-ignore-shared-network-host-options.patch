@@ -20,7 +20,7 @@ diff --git a/act/container/docker_run.go b/act/container/docker_run.go
 diff --git a/act/container/docker_run_test.go b/act/container/docker_run_test.go
 --- a/act/container/docker_run_test.go
 +++ b/act/container/docker_run_test.go
-@@ -730,6 +730,27 @@ func mergeOptions(t *testing.T, runnerOptions, workflowOptions string, privileged
+@@ -730,6 +730,28 @@ func mergeOptions(t *testing.T, runnerOptions, workflowOptions string, privileged
  	return hostConfig, hook
  }
  
@@ -32,9 +32,10 @@ diff --git a/act/container/docker_run_test.go b/act/container/docker_run_test.go
 +				RunnerOptions:   "--add-host forge.local:10.0.3.1",
 +				WorkflowOptions: "--add-host custom.local:10.0.3.2",
 +			}}
-+			_, hostConfig, err := cr.mergeContainerConfigs(t.Context(), &container.Config{}, &container.HostConfig{
++			hostConfig := &container.HostConfig{
 +				NetworkMode: container.NetworkMode(mode),
-+			})
++			}
++			err := cr.mergeContainerConfigs(t.Context(), &container.Config{}, hostConfig)
 +			require.NoError(t, err)
 +			if container.NetworkMode(mode).IsContainer() {
 +				assert.Empty(t, hostConfig.ExtraHosts)

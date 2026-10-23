@@ -92,8 +92,8 @@ index dee56e54..2c173654 100644
  
  	if !rc.Config.NoActionPatch {
  		// Other jobs share the directory, so patch under the copy's lock.
--		defer patchActions(ctx, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
-+		defer patchActions(ctx, actionDir, actionScriptPaths(filepath.Join(actionDir, actionPath), step.getActionModel()))()
+-		defer patchActions(ctx, actionScriptPaths(actionDir, filepath.Join(actionDir, actionPath), step.getActionModel()))()
++		defer patchActions(ctx, actionDir, actionScriptPaths(actionDir, filepath.Join(actionDir, actionPath), step.getActionModel()))()
  	}
  
  	return rc.JobContainer.CopyDir(containerActionDirCopy, actionDir+"/", false, true)(ctx) // an exported commit has no .git to apply gitignore with
@@ -389,6 +389,15 @@ index f824866c..8658998d 100644
  	return script
  }
  
+@@ -327,7 +327,7 @@ func TestRustCacheSplitBundleEndToEnd(t *testing.T) {
+ 	}
+ 	t.Setenv("CARGO_HOME", tempDirPath(t))
+ 
+-	defer patchActions(t.Context(), actionScriptPaths(dir, dir, action))()
++	defer patchActions(t.Context(), dir, actionScriptPaths(dir, dir, action))()
+ 	out := runActionEntrypoint(t, filepath.Join(dir, action.Runs.Main),
+ 		newActionJobEnv(t, "split-runtime-token", artifactcache.JobCredential{Repo: "testuser/testrepo"}), inputs)
+ 
 diff --git a/act/runner/patch_actions_test.go b/act/runner/patch_actions_test.go
 index 8d194b3c..f48f2702 100644
 --- a/act/runner/patch_actions_test.go
@@ -461,7 +470,7 @@ diff --git a/act/runner/step_action_local_test.go b/act/runner/step_action_local
 index b6c09497..0afe5828 100644
 --- a/act/runner/step_action_local_test.go
 +++ b/act/runner/step_action_local_test.go
-@@ -8,15 +8,18 @@ import (
+@@ -8,11 +8,13 @@ import (
  	"bytes"
  	"context"
  	"io"
@@ -475,12 +484,7 @@ index b6c09497..0afe5828 100644
  
  	"gitea.dev/actionslib/pkg/model"
  	"github.com/stretchr/testify/assert"
- 	"github.com/stretchr/testify/mock"
-+	"github.com/stretchr/testify/require"
- 	"go.yaml.in/yaml/v4"
- )
- 
-@@ -36,6 +39,9 @@ func (salm *stepActionLocalMocks) readAction(_ context.Context, step *model.Step
+@@ -45,6 +47,9 @@ func expectStepFileCommands(t *testing.T, cm *containerMock) {
  
  func TestStepActionLocalTest(t *testing.T) {
  	ctx := t.Context()
@@ -489,8 +493,8 @@ index b6c09497..0afe5828 100644
 +	require.NoError(t, os.MkdirAll(actionDir, 0o700))
  
  	cm := &containerMock{}
- 	salm := &stepActionLocalMocks{}
-@@ -47,7 +53,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 	salm := &stepActionMocks{}
+@@ -56,7 +61,7 @@ func TestStepActionLocalTest(t *testing.T) {
  			StepResults: map[string]*model.StepResult{},
  			ExprEval:    &expressionEvaluator{},
  			Config: &Config{
@@ -499,10 +503,7 @@ index b6c09497..0afe5828 100644
  			},
  			Run: &model.Run{
  				JobID: "1",
-@@ -71,8 +77,14 @@ func TestStepActionLocalTest(t *testing.T) {
- 		},
- 	}
- 
+@@ -77,16 +82,23 @@ func TestStepActionLocalTest(t *testing.T) {
 -	salm.On("readAction", sal.Step, filepath.Clean("/tmp/path/to/action"), "", mock.Anything, mock.Anything).
 -		Return(&model.Action{}, nil)
 +	salm.On("readAction", sal.Step, actionDir, "", mock.Anything, mock.Anything).
@@ -514,25 +515,22 @@ index b6c09497..0afe5828 100644
 +		return len(files) == 1 && files[0].Name == "trampoline.js" && files[0].Body == "fixture" && files[0].Mode == 0o400
 +	})).Return(noopExecutor).Once()
  
- 	cm.On("Copy", "/var/run/act", mock.AnythingOfType("[]*container.FileEntry")).Return(noopExecutor)
- 
-@@ -84,7 +96,7 @@ func TestStepActionLocalTest(t *testing.T) {
- 
- 	cm.On("GetContainerArchive", ctx, "/var/run/act/workflow/pathcmd.txt").Return(io.NopCloser(&bytes.Buffer{}), nil)
+ 	expectStepFileCommands(t, cm)
  
 -	salm.On("runAction", sal, filepath.Clean("/tmp/path/to/action"), (*remoteAction)(nil)).Return(noopExecutor)
 +	salm.On("runAction", sal, actionDir, (*remoteAction)(nil)).Return(noopExecutor)
  
  	err := sal.pre()(ctx)
- 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
-@@ -92,6 +104,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 	require.NoError(t, err)
+ 
  	err = sal.main()(ctx)
- 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+ 	require.NoError(t, err)
  
 +	require.NoFileExists(t, filepath.Join(actionDir, "trampoline.js"))
  	cm.AssertExpectations(t)
  	salm.AssertExpectations(t)
  }
+
 diff --git a/act/runner/step_action_remote.go b/act/runner/step_action_remote.go
 index 051dd7e2..1853d4f4 100644
 --- a/act/runner/step_action_remote.go
