@@ -139,6 +139,7 @@ Restored registrations work only while Gitea still recognizes them; restore of t
 7. Container mode is privileged, shares the StartOS kernel and is not equivalent to VM isolation. Both modes require trusted workflow administration.
 8. Arbitrary Docker actions may need image-specific trust/DNS configuration. No TLS-verification bypass is supplied.
 9. Only x86_64 and aarch64 package architectures are supported.
+10. Action metadata, synthetic action files, toolkit bundles and Docker build inputs are read only from inside the action's repository; a symlink leading out of it is refused.
 
 ---
 

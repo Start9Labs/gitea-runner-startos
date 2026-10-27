@@ -3,10 +3,10 @@ Subject: [PATCH] Confine host action reads and writes to their repository
 Retire when upstream confines metadata, synthetic files, compatibility bundles and Docker build inputs.
 
 diff --git a/act/container/docker_build.go b/act/container/docker_build.go
-index 2beb62ca..6853d845 100644
+index 8dcb3137..e6d71ab9 100644
 --- a/act/container/docker_build.go
 +++ b/act/container/docker_build.go
-@@ -90,14 +90,19 @@ func createBuildContext(ctx context.Context, contextDir, relDockerfile string) (
+@@ -87,14 +87,19 @@ func createBuildContext(ctx context.Context, contextDir, relDockerfile string) (
  	// And canonicalize dockerfile name to a platform-independent one
  	relDockerfile = filepath.ToSlash(relDockerfile)
  
@@ -85,19 +85,10 @@ index 00000000..180f7d80
 +	}
 +}
 diff --git a/act/runner/action.go b/act/runner/action.go
-index dee56e54..2c173654 100644
+index b7d3e834..042f529f 100644
 --- a/act/runner/action.go
 +++ b/act/runner/action.go
-@@ -153,7 +153,7 @@ func maybeCopyToActionDir(ctx context.Context, step actionStep, actionDir, actio
- 
- 	if !rc.Config.NoActionPatch {
- 		// Other jobs share the directory, so patch under the copy's lock.
--		defer patchActions(ctx, actionScriptPaths(actionDir, filepath.Join(actionDir, actionPath), step.getActionModel()))()
-+		defer patchActions(ctx, actionDir, actionScriptPaths(actionDir, filepath.Join(actionDir, actionPath), step.getActionModel()))()
- 	}
- 
- 	return rc.JobContainer.CopyDir(containerActionDirCopy, actionDir+"/", false, true)(ctx) // an exported commit has no .git to apply gitignore with
-@@ -306,6 +306,17 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+@@ -310,6 +310,17 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
  	} else {
  		image = rc.dockerActionImage(ctx, step, actionName, localAction)
  		contextDir, fileName := filepath.Split(filepath.Join(basedir, action.Runs.Image))
@@ -171,10 +162,10 @@ index 00000000..7b400668
 +}
 diff --git a/act/runner/action_source_test.go b/act/runner/action_source_test.go
 new file mode 100644
-index 00000000..6e33944b
+index 00000000..97a65bdd
 --- /dev/null
 +++ b/act/runner/action_source_test.go
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,150 @@
 +// Copyright 2026 The Gitea Authors. All rights reserved.
 +// SPDX-License-Identifier: MIT
 +
@@ -283,16 +274,12 @@ index 00000000..6e33944b
 +	action := &model.Action{Runs: model.ActionRuns{Using: "node20", Main: "index.js"}}
 +	scripts := actionScriptPaths(repository, repository, action)
 +	require.Len(t, scripts, 1)
-+	canonicalScript, err := filepath.EvalSymlinks(script)
-+	require.NoError(t, err)
-+	require.Equal(t, canonicalScript, scripts[0])
-+	func() {
-+		restore := patchActions(t.Context(), repository, scripts)
-+		defer restore()
-+		patched, err := os.ReadFile(script)
-+		require.NoError(t, err)
-+		require.True(t, gateOpened(string(patched)))
-+	}()
++	require.Equal(t, "index.js", scripts[0])
++	patched := patchedScripts(t.Context(), repository, scripts)
++	require.Len(t, patched, 1)
++	require.Equal(t, "index.js", patched[0].Name)
++	require.Equal(t, int64(0o600), patched[0].Mode)
++	require.True(t, gateOpened(patched[0].Body))
 +	original, err := os.ReadFile(script)
 +	require.NoError(t, err)
 +	require.Equal(t, gateTSC, string(original))
@@ -307,27 +294,33 @@ index 00000000..6e33944b
 +	source, err := os.OpenRoot(repository)
 +	require.NoError(t, err)
 +	defer source.Close()
-+	original, err := patchBundle(source, "index.js")
++	original, _, err := patchedScript(source, "index.js")
 +	require.Error(t, err)
 +	require.Nil(t, original)
++	require.Empty(t, patchedScripts(t.Context(), repository, []string{"index.js"}))
 +	require.NoError(t, os.Remove(script))
 +	require.NoError(t, os.WriteFile(script, []byte(gateTSC), 0o600))
-+	restore := patchActions(t.Context(), repository, []string{script})
-+	patched, err := os.ReadFile(script)
++	action := &model.Action{Runs: model.ActionRuns{Using: "node20", Main: "index.js"}}
++	scripts := actionScriptPaths(repository, repository, action)
++	require.Equal(t, []string{"index.js"}, scripts)
++	patched := patchedScripts(t.Context(), repository, scripts)
++	require.Len(t, patched, 1)
++	require.True(t, gateOpened(patched[0].Body))
++	contents, err := os.ReadFile(script)
 +	require.NoError(t, err)
-+	require.True(t, gateOpened(string(patched)))
++	require.Equal(t, gateTSC, string(contents))
 +	require.NoError(t, os.Remove(script))
 +	require.NoError(t, os.Symlink(outside, script))
-+	restore()
-+	contents, err := os.ReadFile(outside)
++	require.Empty(t, patchedScripts(t.Context(), repository, scripts))
++	contents, err = os.ReadFile(outside)
 +	require.NoError(t, err)
 +	require.Equal(t, gateTSC, string(contents))
 +}
 diff --git a/act/runner/action_test.go b/act/runner/action_test.go
-index 795dd70d..fe5c9afd 100644
+index 1f919492..c015807e 100644
 --- a/act/runner/action_test.go
 +++ b/act/runner/action_test.go
-@@ -406,6 +406,7 @@ func TestMaybeCopyToActionDirHoldsCloneLock(t *testing.T) {
+@@ -399,6 +399,7 @@ func TestMaybeCopyToActionDirHoldsCloneLock(t *testing.T) {
  
  func TestExecAsDockerHoldsCloneLockForRemoteUncached(t *testing.T) {
  	actionDir := t.TempDir()
@@ -335,141 +328,93 @@ index 795dd70d..fe5c9afd 100644
  
  	unlock, err := git.AcquireCloneLock(t.Context(), actionDir)
  	require.NoError(t, err)
+@@ -523,6 +524,7 @@ func TestExecAsDockerImageChecks(t *testing.T) {
+ 				env:    map[string]string{},
+ 			}
+ 			dir := t.TempDir()
++			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM scratch\n"), 0o600))
+ 			require.NoError(t, execAsDocker(t.Context(), step, "action", dir, dir, false, stepStageMain))
+ 			assert.Equal(t, testcase.wantChecks, checks)
+ 			assert.Equal(t, testcase.wantBuild, built)
 diff --git a/act/runner/patch_actions.go b/act/runner/patch_actions.go
-index c82f75d7..8ec6d327 100644
+index f0b474ab..93666402 100644
 --- a/act/runner/patch_actions.go
 +++ b/act/runner/patch_actions.go
-@@ -106,20 +106,36 @@ func actionScriptPaths(dir string, action *model.Action) []string {
- }
+@@ -127,9 +127,18 @@ func actionScriptPaths(checkout, dir string, action *model.Action) []string {
  
- // patchActions returns a restore: the tree is shared, so a job with patching off gets no edits.
--func patchActions(ctx context.Context, scripts []string) func() {
-+func patchActions(ctx context.Context, repository string, scripts []string) func() {
-+	repository, err := filepath.EvalSymlinks(repository)
-+	if err != nil {
-+		common.Logger(ctx).Warnf("actions toolkit: cannot resolve source repository: %v", err)
-+		return func() {}
+ // patchedScripts returns the scripts needing the edit, patched, to copy over the job container's copy.
+ func patchedScripts(ctx context.Context, checkout string, scripts []string) []*container.FileEntry {
++	if len(scripts) == 0 {
++		return nil
 +	}
-+	source, err := os.OpenRoot(repository)
++	source, err := os.OpenRoot(checkout)
 +	if err != nil {
 +		common.Logger(ctx).Warnf("actions toolkit: cannot open source repository: %v", err)
-+		return func() {}
++		return nil
 +	}
- 	restore := map[string][]byte{}
++	defer source.Close()
+ 	var patched []*container.FileEntry
  	for _, script := range scripts {
--		original, err := patchBundle(script)
-+		relative, err := filepath.Rel(repository, script)
-+		if err != nil {
-+			common.Logger(ctx).Warnf("actions toolkit: cannot resolve script: %v", err)
-+			continue
-+		}
-+		original, err := patchBundle(source, relative)
- 		if original != nil {
--			restore[script] = original // also when the write failed part way through
-+			restore[relative] = original // also when the write failed part way through
- 		}
+-		body, mode, err := patchedScript(filepath.Join(checkout, script))
++		body, mode, err := patchedScript(source, script)
  		if err != nil {
  			common.Logger(ctx).Warnf("actions toolkit: %s left unpatched: %v", script, err)
- 		}
- 	}
- 	return func() {
-+		defer source.Close()
- 		for script, original := range restore {
--			if err := os.WriteFile(script, original, 0o644); err != nil { //nolint:gosec // as the checkout wrote it
-+			if err := source.WriteFile(script, original, 0o644); err != nil {
- 				common.Logger(ctx).Warnf("actions toolkit: %s left patched in the shared copy: %v", script, err)
- 			}
- 		}
-@@ -127,15 +143,15 @@ func patchActions(ctx context.Context, scripts []string) func() {
+ 		} else if body != nil {
+@@ -140,15 +149,15 @@ func patchedScripts(ctx context.Context, checkout string, scripts []string) []*c
  }
  
- // patchBundle returns the bytes it replaced, or nil when it left the bundle alone.
--func patchBundle(script string) ([]byte, error) {
+ // patchedScript returns the bundle patched, or nil when it is left alone.
+-func patchedScript(script string) ([]byte, os.FileMode, error) {
 -	info, err := os.Stat(script)
-+func patchBundle(source *os.Root, script string) ([]byte, error) {
++func patchedScript(source *os.Root, script string) ([]byte, os.FileMode, error) {
 +	info, err := source.Stat(script)
  	if err != nil {
- 		return nil, err
+ 		return nil, 0, err
  	}
  	if info.Size() > maxBundleSize {
- 		return nil, nil
+ 		return nil, 0, nil
  	}
 -	data, err := os.ReadFile(script)
 +	data, err := source.ReadFile(script)
  	if err != nil {
- 		return nil, err
+ 		return nil, 0, err
  	}
-@@ -143,7 +159,7 @@ func patchBundle(script string) ([]byte, error) {
- 	if !ok {
- 		return nil, nil
- 	}
--	return data, os.WriteFile(script, patched, info.Mode().Perm())
-+	return data, source.WriteFile(script, patched, info.Mode().Perm())
- }
- 
- // patchedBundle opens the GHES gate, and where the cache toolkit is present, points the cache
-diff --git a/act/runner/patch_actions_e2e_test.go b/act/runner/patch_actions_e2e_test.go
-index f824866c..8658998d 100644
---- a/act/runner/patch_actions_e2e_test.go
-+++ b/act/runner/patch_actions_e2e_test.go
-@@ -116,7 +116,7 @@ func patchedAction(t *testing.T, repo, ref, entrypoint string) string {
- 	require.NoError(t, err)
- 	script := filepath.Join(tempDirPath(t), filepath.Base(entrypoint))
- 	require.NoError(t, os.WriteFile(script, body, 0o600))
--	patchActions(t.Context(), []string{script})
-+	t.Cleanup(patchActions(t.Context(), filepath.Dir(script), []string{script}))
- 	return script
- }
- 
-@@ -327,7 +327,7 @@ func TestRustCacheSplitBundleEndToEnd(t *testing.T) {
- 	}
- 	t.Setenv("CARGO_HOME", tempDirPath(t))
- 
--	defer patchActions(t.Context(), actionScriptPaths(dir, dir, action))()
-+	defer patchActions(t.Context(), dir, actionScriptPaths(dir, dir, action))()
- 	out := runActionEntrypoint(t, filepath.Join(dir, action.Runs.Main),
- 		newActionJobEnv(t, "split-runtime-token", artifactcache.JobCredential{Repo: "testuser/testrepo"}), inputs)
- 
 diff --git a/act/runner/patch_actions_test.go b/act/runner/patch_actions_test.go
-index 8d194b3c..f48f2702 100644
+index 9ca93b77..42a90943 100644
 --- a/act/runner/patch_actions_test.go
 +++ b/act/runner/patch_actions_test.go
-@@ -175,15 +175,18 @@ func TestPatchedBundleSurvivesInsideAStringLiteral(t *testing.T) {
- // An action with a pre step is copied, and so patched, twice.
- func TestPatchBundleIsIdempotent(t *testing.T) {
+@@ -191,19 +191,26 @@ func TestPatchedBundleSurvivesInsideAStringLiteral(t *testing.T) {
+ // A bundle an older runner left patched in the shared copy is copied as it is.
+ func TestPatchedScriptIsIdempotent(t *testing.T) {
  	script := bundleFile(t, gateTSC)
 +	source, err := os.OpenRoot(filepath.Dir(script))
 +	require.NoError(t, err)
 +	defer source.Close()
  
--	original, err := patchBundle(script)
-+	original, err := patchBundle(source, filepath.Base(script))
- 	require.NoError(t, err)
- 	require.NotNil(t, original)
- 	patched, err := os.ReadFile(script)
+-	patched, _, err := patchedScript(script)
++	patched, _, err := patchedScript(source, filepath.Base(script))
  	require.NoError(t, err)
  	require.True(t, gateOpened(string(patched)))
  
--	original, err = patchBundle(script)
-+	original, err = patchBundle(source, filepath.Base(script))
+ 	require.NoError(t, os.WriteFile(script, patched, 0o600))
+-	again, _, err := patchedScript(script)
++	again, _, err := patchedScript(source, filepath.Base(script))
  	require.NoError(t, err)
- 	assert.Nil(t, original, "a patched bundle is not patched again")
- 	again, err := os.ReadFile(script)
-@@ -193,8 +196,11 @@ func TestPatchBundleIsIdempotent(t *testing.T) {
+ 	assert.Nil(t, again, "a patched bundle is not patched again")
+ }
  
- func TestPatchBundleLeavesOtherActionsAlone(t *testing.T) {
- 	script := bundleFile(t, `console.log("checkout")`)
+ func TestPatchedScriptLeavesOtherActionsAlone(t *testing.T) {
+-	patched, _, err := patchedScript(bundleFile(t, `console.log("checkout")`))
++	script := bundleFile(t, `console.log("checkout")`)
 +	source, err := os.OpenRoot(filepath.Dir(script))
 +	require.NoError(t, err)
 +	defer source.Close()
- 
--	original, err := patchBundle(script)
-+	original, err := patchBundle(source, filepath.Base(script))
++	patched, _, err := patchedScript(source, filepath.Base(script))
  	require.NoError(t, err)
- 	assert.Nil(t, original)
- 	body, err := os.ReadFile(script)
+ 	assert.Nil(t, patched)
+ }
 diff --git a/act/runner/step_action_local.go b/act/runner/step_action_local.go
-index ad02e981..fef89fcb 100644
+index 0fde48c3..e199e299 100644
 --- a/act/runner/step_action_local.go
 +++ b/act/runner/step_action_local.go
 @@ -16,6 +16,7 @@ import (
@@ -480,7 +425,7 @@ index ad02e981..fef89fcb 100644
  
  	"gitea.dev/actionslib/pkg/model"
  )
-@@ -80,7 +81,16 @@ func (sal *stepActionLocal) main() common.Executor {
+@@ -76,7 +77,16 @@ func (sal *stepActionLocal) main() common.Executor {
  			return nil, nil, fmt.Errorf("max depth %d of symlinks exceeded while reading %s", maxSymlinkDepth, spath)
  		}
  
@@ -499,7 +444,7 @@ index ad02e981..fef89fcb 100644
  			return err
  		}
 diff --git a/act/runner/step_action_local_test.go b/act/runner/step_action_local_test.go
-index b6c09497..0afe5828 100644
+index 98fc841a..148fa1f6 100644
 --- a/act/runner/step_action_local_test.go
 +++ b/act/runner/step_action_local_test.go
 @@ -8,11 +8,13 @@ import (
@@ -532,10 +477,13 @@ index b6c09497..0afe5828 100644
  			Config: &Config{
 -				Workdir: "/tmp",
 +				Workdir: workdir,
+ 				Env:     testCheckoutEnv(),
  			},
  			Run: &model.Run{
- 				JobID: "1",
-@@ -77,16 +82,23 @@ func TestStepActionLocalTest(t *testing.T) {
+@@ -75,12 +80,18 @@ func TestStepActionLocalTest(t *testing.T) {
+ 		},
+ 	}
+ 
 -	salm.On("readAction", sal.Step, filepath.Clean("/tmp/path/to/action"), "", mock.Anything, mock.Anything).
 -		Return(&model.Action{}, nil)
 +	salm.On("readAction", sal.Step, actionDir, "", mock.Anything, mock.Anything).
@@ -554,7 +502,7 @@ index b6c09497..0afe5828 100644
  
  	err := sal.pre()(ctx)
  	require.NoError(t, err)
- 
+@@ -88,6 +99,7 @@ func TestStepActionLocalTest(t *testing.T) {
  	err = sal.main()(ctx)
  	require.NoError(t, err)
  
@@ -562,12 +510,11 @@ index b6c09497..0afe5828 100644
  	cm.AssertExpectations(t)
  	salm.AssertExpectations(t)
  }
-
 diff --git a/act/runner/step_action_remote.go b/act/runner/step_action_remote.go
-index 051dd7e2..1853d4f4 100644
+index 31ded4ca..0627a161 100644
 --- a/act/runner/step_action_remote.go
 +++ b/act/runner/step_action_remote.go
-@@ -102,12 +102,24 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
+@@ -120,12 +120,24 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
  		}
  		defer unlock()
  
@@ -595,10 +542,10 @@ index 051dd7e2..1853d4f4 100644
  		return err
  	}
 diff --git a/act/runner/step_action_remote_test.go b/act/runner/step_action_remote_test.go
-index 1c40368c..b60af700 100644
+index ea0197c1..40939cfc 100644
 --- a/act/runner/step_action_remote_test.go
 +++ b/act/runner/step_action_remote_test.go
-@@ -34,7 +34,13 @@ type stepActionRemoteMocks struct {
+@@ -28,7 +28,13 @@ import (
  
  func setFetch(t *testing.T, fetch func(context.Context, git.NewGitCloneExecutorInput) (string, string, error)) {
  	original := stepActionRemoteFetch
