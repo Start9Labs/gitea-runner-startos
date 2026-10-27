@@ -5,13 +5,13 @@ COPY upstream/ ./
 COPY patches/ /patches/
 RUN for file in /patches/*.patch; do git apply "$file"; done
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go test -short -run '^Test(RemoteMetadataAndFallbackBoundary|RemoteDockerBuildBoundary|ActionBundleReadWriteBoundary|StepActionLocalTest|StepActionRemote|PatchBundle|PatchActionsAtTheContainerCopy|ExecAsDockerHoldsCloneLockForRemoteUncached|TrustedRootCA|SerialJobs|DefaultParallelJobs|DockerImagePlatform)' ./act/runner \
+    CGO_ENABLED=0 go test -short -run '^Test(RemoteMetadataAndFallbackBoundary|RemoteDockerBuildBoundary|ActionBundleReadWriteBoundary|StepActionLocalTest|StepActionRemote|PatchBundle|PatchedScript|PatchActionsAtTheContainerCopy|ExecAsDockerHoldsCloneLockForRemoteUncached|ExecAsDockerImageChecks|TrustedRootCA|SerialJobs|DefaultParallelJobs|DockerImagePlatform)' ./act/runner \
  && CGO_ENABLED=0 go test -short ./act/container ./internal/app/run ./internal/app/cmd ./internal/pkg/config ./internal/pkg/labels ./internal/app/poll
 ARG TARGETOS
 ARG TARGETARCH
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags netgo,osusergo \
-      -ldflags '-s -w -X gitea.com/gitea/runner/internal/pkg/ver.version=v5.2.2' \
+      -ldflags '-s -w -X gitea.com/gitea/runner/internal/pkg/ver.version=v5.2.3' \
       -o /bin/gitea-runner .
 FROM $BINFMT_IMAGE AS binfmt
 

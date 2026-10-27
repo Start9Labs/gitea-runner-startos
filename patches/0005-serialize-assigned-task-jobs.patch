@@ -3,7 +3,7 @@ Subject: [PATCH] Bound locally expanded jobs and matrices within each assignment
 Retire when upstream bounds both local scheduler fan-outs recursively per assigned task.
 
 diff --git a/act/runner/runner.go b/act/runner/runner.go
-index 13a16564..7117d5a1 100644
+index 4beec56c..8b1f41c4 100644
 --- a/act/runner/runner.go
 +++ b/act/runner/runner.go
 @@ -36,6 +36,7 @@ type Config struct {
@@ -14,7 +14,7 @@ index 13a16564..7117d5a1 100644
  	ForcePull                     bool                                          // force pulling of the image, even if already present
  	ForceRebuild                  bool                                          // force rebuilding local docker image action
  	JSONLogger                    bool                                          // use json or text logger
-@@ -293,7 +294,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
+@@ -284,7 +285,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
  				// Run all matrix combinations of this job, then drop its aggregation mutex: the
  				// combos are the only users of it, so once they finish the jobMutexes entry can be
  				// released, keeping the map from growing unbounded over a long-lived runner.
@@ -23,7 +23,7 @@ index 13a16564..7117d5a1 100644
  				pipeline = append(pipeline, func(ctx context.Context) error {
  					defer jobMutexes.Delete(job)
  					return stageParallel(ctx)
-@@ -318,7 +319,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
+@@ -319,7 +320,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
  			parallelism = min(parallelism, len(pipeline))
  
  			logging.Infof("Executing %d pipeline elements with parallelism %d", len(pipeline), parallelism)
@@ -32,11 +32,10 @@ index 13a16564..7117d5a1 100644
  		})
  	}
  
-@@ -325,6 +326,13 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
- 		return executor(container.WithRunnerArch(ghcontext.WithPinnedCheckout(ctx)))
+@@ -329,6 +330,13 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
  	}
  }
-
+ 
 +func (runner *runnerImpl) parallelJobExecutor(parallel int, executors ...common.Executor) common.Executor {
 +	if runner.config.SerialJobs {
 +		parallel = 1
@@ -198,10 +197,10 @@ index 00000000..5e3ac290
 +	require.ElementsMatch(t, []string{"matrix-one", "matrix-two", "independent", "nested-one", "nested-two"}, strings.Fields(string(data)))
 +}
 diff --git a/internal/app/run/runner.go b/internal/app/run/runner.go
-index b08b1a36..92137173 100644
+index 9c6b8da7..ae8d7b01 100644
 --- a/internal/app/run/runner.go
 +++ b/internal/app/run/runner.go
-@@ -611,8 +611,8 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
+@@ -601,8 +601,8 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
  		}
  	}()
  
