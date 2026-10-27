@@ -43,8 +43,6 @@ A custom Debian image builds the pinned upstream source with package patches. Th
 | `container-engine` | Rootful Docker backend when virtualization is explicitly disabled |
 | `runner-controller` | One native daemon with configured assignment capacity in container mode |
 
-Remote JavaScript toolkit compatibility edits affect only the job container's copy; cached action sources remain unchanged. Action-source reads remain confined to the action repository.
-
 The controller, preparer and nested engine commands run as root inside the service. The image supports x86_64 and aarch64, includes Git/OpenSSH, and uses filesystem and KVM grants, not a TUN device. KVM is probed by opening its device. Once VM execution is selected, boot or provisioning errors fail the assignment rather than retrying it as a container or using TCG.
 
 Virtualized workers wait for an assignment before requesting a guest. Each assignment gets a new overlay, cloud-init identity and Docker server certificate. No guest runs while its slot is idle. The base disk is read-only to workers. The guest receives its server-authentication key and public CA certificate, never the controller's registration, Docker client private key, CA signing key, filesystem or engine socket. The CA signing key is discarded after issuing the per-guest identities.
@@ -141,6 +139,7 @@ Restored registrations work only while Gitea still recognizes them; restore of t
 7. Container mode is privileged, shares the StartOS kernel and is not equivalent to VM isolation. Both modes require trusted workflow administration.
 8. Arbitrary Docker actions may need image-specific trust/DNS configuration. No TLS-verification bypass is supplied.
 9. Only x86_64 and aarch64 package architectures are supported.
+10. Action metadata, synthetic action files, toolkit bundles and Docker build inputs are read only from inside the action's repository; a symlink leading out of it is refused.
 
 ---
 
