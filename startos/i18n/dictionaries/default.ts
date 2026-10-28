@@ -50,6 +50,15 @@ const dict = {
   'Preparing a disposable VM': 46,
   'Running a job': 47,
   'Virtualization is enabled but KVM is unavailable. Restore KVM access and save Configure with Virtualization on, or run Configure to explicitly select container mode.': 48,
+  'Gitea Instance': 49,
+  'The Gitea this runner takes jobs from: the one installed on this server, or one running elsewhere. Changing the instance requires a fresh registration token.': 50,
+  'This server': 51,
+  'Remote server': 52,
+  'Gitea URL': 53,
+  'The address of the remote Gitea, as its users open it, for example https://git.example.com. An HTTPS address needs a publicly trusted certificate, and the address must be reachable from this server and from job containers.': 54,
+  'Must be an http:// or https:// address with no query or fragment': 55,
+  'Changing the Gitea instance requires a fresh registration token.': 56,
+  'A remote Gitea URL is required.': 57,
 }
 
 export type I18nKey = keyof typeof dict

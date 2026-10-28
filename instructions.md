@@ -6,14 +6,14 @@
 
 ## Getting set up
 
-Your runner serves **Gitea on this device**. Have Gitea running with Actions enabled before configuring the runner.
+Your runner serves **Gitea on this device** or **Gitea on another server**. Have Actions enabled on the selected Gitea before configuring the runner. For this device's Gitea, it must also be running here.
 
 1. In Gitea, create a runner registration token under **Site / Organization / Repository Settings → Actions → Runners → Create new Runner**.
-2. Open **Configure** here. Paste the token and choose a runner name, labels and concurrent-job limit. The default label is `ubuntu-latest`.
+2. Open **Configure** here. Under **Gitea Instance**, keep **This server**, or choose **Remote server** and enter the address you open Gitea at, such as `https://git.example.com`. An HTTPS address needs a publicly trusted certificate, so a remote `.local` address does not work. Paste the token from that Gitea and choose a runner name, labels and concurrent-job limit. The default label is `ubuntu-latest`.
 3. Leave **Virtualization** enabled when available for a separate guest kernel per assignment. Without accessible KVM, new configurations default to containers sharing the StartOS kernel. Use container mode only for trusted workflows.
 4. Start the service. First-time VM preparation can take several minutes; watch **VM Image Preparation**. When ready, your runner appears online in Gitea.
 
-For later execution-setting changes, **leave Registration Token blank** to keep your identity. Saving Configure interrupts active jobs and restarts the runner. Supply a fresh token only to create or replace registration, including a name change. A failed replacement keeps the previous identity.
+For later execution-setting changes, **leave Registration Token blank** to keep your identity. Saving Configure interrupts active jobs and restarts the runner. Supply a fresh token only to create or replace registration, including a name or Gitea instance change. Changing between local and remote, or changing the remote address, requires a fresh token from the selected Gitea. A failed replacement keeps the previous identity.
 
 If Gitea no longer recognizes your runner, use Configure with a fresh token. Restarting with a spent token cannot repair registration. A restored identity does not require the old registration token to remain saved.
 
@@ -39,7 +39,7 @@ The built-in checkout action can use your job's token without downloading anothe
 - uses: builtin:checkout
 ```
 
-Your job image needs Git; SSH checkout also needs an SSH client. Ordinary jobs receive public StartOS certificate trust and routing for Gitea's local hostname. If you use a custom Docker action image, provide its required certificate trust and DNS configuration in that image or workflow. Do not disable certificate verification to work around a failing connection.
+Your job image needs Git; SSH checkout also needs an SSH client. Ordinary jobs receive this server's public StartOS certificate trust and, when using Gitea on this device, routing for Gitea's local hostname. A remote Gitea's address must also be reachable from job containers. If you use a custom Docker action image, provide its required certificate trust and DNS configuration in that image or workflow. Do not disable certificate verification to work around a failing connection.
 
 ### Choosing container mode
 
