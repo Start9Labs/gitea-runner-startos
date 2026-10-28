@@ -1,5 +1,4 @@
 import { cpus, totalmem } from 'os'
-import { mainHostId as giteaHostId, uiPort } from 'gitea-startos/startos/utils'
 import {
   VM_PREPARATION_STATUS,
   VM_PREPARATION_PROBE,
@@ -37,6 +36,7 @@ import {
   vmDiskSize,
   installRootCa,
   installLocalHosts,
+  giteaConnection,
 } from './utils'
 
 export const main = sdk.setupMain(async ({ effects }) => {
@@ -59,42 +59,12 @@ export const main = sdk.setupMain(async ({ effects }) => {
       ),
     )
   }
-  const bridge = await sdk.host
-    .getBridgeAddress(effects, {
-      packageId: 'gitea',
-      hostId: giteaHostId,
-      internalPort: uiPort,
-      ssl: false,
-    })
-    .const()
-  if (!bridge) {
-    throw new Error(
-      i18n(
-        'Gitea is not yet reachable on the internal network. The runner will connect once its Gitea dependency is running.',
-      ),
-    )
-  }
+  const { url, localHosts } = await giteaConnection(effects, store.remoteUrl)
   const available = await virtualizationAvailable(effects)
   const backend = runnerBackend(store.virtualization, available)
   const rootCa = await sdk.getRootCa(effects)
-  const osIp = await sdk.getOsIp(effects)
-  const localHosts = await sdk.host
-    .get(effects, { packageId: 'gitea', hostId: giteaHostId }, (host) =>
-      [
-        ...new Set(
-          Object.values(host?.bindings[uiPort]?.interfaces ?? {})
-            .flatMap((iface) =>
-              iface.addressInfo
-                .filter({ kind: 'mdns' })
-                .format('hostname-info'),
-            )
-            .map((address) => `${address.hostname}:${osIp}`),
-        ),
-      ].sort(),
-    )
-    .const()
   const env = {
-    INSTANCE_URL: `http://${bridge}`,
+    INSTANCE_URL: url,
     RUNNER_LABELS: runnerLabels(store).join(','),
     RUNNER_DEFAULT_IMAGE: EMULATION_IMAGE,
     RUNNER_REGISTRATION_DIR: '/registration',
