@@ -6,6 +6,7 @@ const shape = z.looseObject({
   registrationToken: z.string().catch(''),
   registrationRevision: z.number().int().nonnegative().catch(0),
   runnerName: z.string().catch(''),
+  remoteUrl: z.string().catch(''),
   labels: z.string().catch(DEFAULT_RUNNER_LABELS),
   capacity: z.number().int().min(1).max(MAX_JOB_CAPACITY).catch(1),
   emulation: z.boolean().catch(false),

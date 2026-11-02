@@ -1,14 +1,10 @@
 import { configure } from 'gitea-startos/startos/actions/configure'
+import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { dependencyDescription } from './manifest/i18n'
 import { sdk } from './sdk'
 
-// This runner only ever serves the Gitea on this same device — a hard
-// dependency. A box that wants its own CI runs its own runner; we don't reach
-// across to a remote forge. Gitea must be running AND its web interface
-// (the 'primary' health check) reachable, since the runner registers and polls
-// over Gitea's HTTP API.
-const gitea = sdk.Dependency.required('gitea', {
+const gitea = sdk.Dependency.optional('gitea', {
   description: dependencyDescription,
   metadata: {
     title: 'Gitea',
@@ -17,6 +13,8 @@ const gitea = sdk.Dependency.required('gitea', {
   versionRange: '>=1.27.3:1',
   kind: 'running',
   healthChecks: ['primary'],
+  enabled: async ({ effects }) =>
+    !(await storeJson.read((s) => s.remoteUrl).const(effects)),
 }).withInit(async (effects) => {
   await sdk.action.createTask(effects, 'gitea', configure, 'critical', {
     input: {

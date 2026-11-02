@@ -1,3 +1,4 @@
+import { mainHostId as giteaHostId, uiPort } from 'gitea-startos/startos/utils'
 import { sdk } from './sdk'
 import { i18n } from './i18n'
 import {
@@ -126,6 +127,53 @@ export function runnerLabels(
   const resolved = resolveRunnerLabels(settings)
   if (resolved.error) throw new Error(i18n(resolved.error))
   return resolved.labels
+}
+
+export function remoteGiteaUrl(url: string) {
+  const normalized = url.trim().replace(/\/+$/, '')
+  if (!normalized) {
+    throw new Error(i18n('A remote Gitea URL is required.'))
+  }
+  return normalized
+}
+
+export async function giteaConnection(
+  effects: Parameters<typeof sdk.SubContainer.of>[0],
+  remoteUrl: string,
+) {
+  if (remoteUrl) return { url: remoteUrl, localHosts: [] as string[] }
+  const bridge = await sdk.host
+    .getBridgeAddress(effects, {
+      packageId: 'gitea',
+      hostId: giteaHostId,
+      internalPort: uiPort,
+      ssl: false,
+    })
+    .const()
+  if (!bridge) {
+    throw new Error(
+      i18n(
+        'Gitea is not yet reachable on the internal network. The runner will connect once its Gitea dependency is running.',
+      ),
+    )
+  }
+  const osIp = await sdk.getOsIp(effects)
+  const localHosts = await sdk.host
+    .get(effects, { packageId: 'gitea', hostId: giteaHostId }, (host) =>
+      [
+        ...new Set(
+          Object.values(host?.bindings[uiPort]?.interfaces ?? {})
+            .flatMap((iface) =>
+              iface.addressInfo
+                .filter({ kind: 'mdns' })
+                .format('hostname-info'),
+            )
+            .map((address) => `${address.hostname}:${osIp}`),
+        ),
+      ].sort(),
+    )
+    .const()
+  return { url: `http://${bridge}`, localHosts }
 }
 
 export function runnerBackend(virtualization: boolean, available: boolean) {

@@ -14,6 +14,7 @@ import {
   virtualizationAvailable,
   vmResources,
   vmDiskSize,
+  remoteGiteaUrl,
 } from '../utils'
 
 export const configure = sdk.Action.withInput(
@@ -35,6 +36,38 @@ export const configure = sdk.Action.withInput(
     const receipt = await registrationReceipt.read().once()
     const pending = store && registrationPending(store, !!registered, receipt)
     return sdk.InputSpec.of({
+      gitea: sdk.Value.union({
+        name: i18n('Gitea Instance'),
+        description: i18n(
+          'The Gitea this runner takes jobs from: the one installed on this server, or one running elsewhere. Changing the instance requires a fresh registration token.',
+        ),
+        default: 'local',
+        variants: sdk.Variants.of({
+          local: { name: i18n('This server'), spec: sdk.InputSpec.of({}) },
+          remote: {
+            name: i18n('Remote server'),
+            spec: sdk.InputSpec.of({
+              url: sdk.Value.text({
+                name: i18n('Gitea URL'),
+                description: i18n(
+                  'The address of the remote Gitea, as its users open it, for example https://git.example.com. An HTTPS address needs a publicly trusted certificate, and the address must be reachable from this server and from job containers.',
+                ),
+                required: true,
+                default: null,
+                inputmode: 'url',
+                patterns: [
+                  {
+                    regex: '^https?://[^\\s"\'\\\\/?#]+(/[^\\s"\'\\\\?#]*)?$',
+                    description: i18n(
+                      'Must be an http:// or https:// address with no query or fragment',
+                    ),
+                  },
+                ],
+              }),
+            }),
+          },
+        }),
+      }),
       registrationToken: sdk.Value.text({
         name: i18n('Registration Token'),
         description: i18n(
@@ -96,6 +129,9 @@ export const configure = sdk.Action.withInput(
     const registered = await runnerState.read().once()
     const receipt = await registrationReceipt.read().once()
     return {
+      gitea: store.remoteUrl
+        ? { selection: 'remote' as const, value: { url: store.remoteUrl } }
+        : { selection: 'local' as const, value: {} },
       registrationToken: undefined,
       runnerName: registrationName(store, registered, receipt),
       labels: store.labels,
@@ -105,13 +141,22 @@ export const configure = sdk.Action.withInput(
         (await virtualizationAvailable(effects)) && store.virtualization,
     }
   },
-  async ({ effects, input }) => {
+  async ({ effects, input: { gitea, ...input } }) => {
     const store = await storeJson.read().once()
     if (!store) throw new Error(i18n('Store not found'))
     const registered = await runnerState.read().once()
     const receipt = await registrationReceipt.read().once()
     const pending = registrationPending(store, !!registered, receipt)
     const token = input.registrationToken?.trim() || ''
+    const remoteUrl =
+      gitea.selection === 'remote' ? remoteGiteaUrl(gitea.value.url) : ''
+    if (remoteUrl !== store.remoteUrl && !token) {
+      throw new Error(
+        i18n(
+          'Changing the Gitea instance requires a fresh registration token.',
+        ),
+      )
+    }
     const previousName = registrationName(store, registered, receipt)
     const name = input.runnerName?.trim() || previousName
     if (!token && registered && name !== previousName) {
@@ -138,6 +183,7 @@ export const configure = sdk.Action.withInput(
       registrationToken: token || (pending ? store.registrationToken : ''),
       registrationRevision: store.registrationRevision + (token ? 1 : 0),
       runnerName: name,
+      remoteUrl,
       labels: input.labels,
       capacity: input.capacity,
       emulation: input.emulation,

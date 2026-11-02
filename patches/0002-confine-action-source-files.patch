@@ -444,7 +444,7 @@ index 0fde48c3..e199e299 100644
  			return err
  		}
 diff --git a/act/runner/step_action_local_test.go b/act/runner/step_action_local_test.go
-index 98fc841a..148fa1f6 100644
+index 6754fc7c..331dc419 100644
 --- a/act/runner/step_action_local_test.go
 +++ b/act/runner/step_action_local_test.go
 @@ -8,11 +8,13 @@ import (
@@ -461,7 +461,7 @@ index 98fc841a..148fa1f6 100644
  
  	"gitea.dev/actionslib/pkg/model"
  	"github.com/stretchr/testify/assert"
-@@ -45,6 +47,9 @@ func expectStepFileCommands(t *testing.T, cm *containerMock) {
+@@ -46,6 +48,9 @@ func expectStepFileCommands(t *testing.T, cm *containerMock) {
  
  func TestStepActionLocalTest(t *testing.T) {
  	ctx := t.Context()
@@ -471,8 +471,8 @@ index 98fc841a..148fa1f6 100644
  
  	cm := &containerMock{}
  	salm := &stepActionMocks{}
-@@ -56,7 +61,7 @@ func TestStepActionLocalTest(t *testing.T) {
- 			StepResults: map[string]*model.StepResult{},
+@@ -57,7 +62,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 			StepResults: map[string]*model.StepResult{"previous": {Outputs: map[string]string{"value": "previous"}}},
  			ExprEval:    &expressionEvaluator{},
  			Config: &Config{
 -				Workdir: "/tmp",
@@ -480,9 +480,9 @@ index 98fc841a..148fa1f6 100644
  				Env:     testCheckoutEnv(),
  			},
  			Run: &model.Run{
-@@ -75,12 +80,18 @@ func TestStepActionLocalTest(t *testing.T) {
- 		},
- 	}
+@@ -84,12 +89,18 @@ func TestStepActionLocalTest(t *testing.T) {
+ 	require.NoError(t, sal.Step.Env.Encode(map[string]string{"STEP_VALUE": "step", "GITHUB_ACTION_REPOSITORY": "forged/repo", "GITHUB_ACTION_REF": "forged-ref"}))
+ 	require.NoError(t, sal.Step.RawWith.Encode(map[string]string{"identity": "${{ github.action_repository }}|${{ github.action_ref }}"}))
  
 -	salm.On("readAction", sal.Step, filepath.Clean("/tmp/path/to/action"), "", mock.Anything, mock.Anything).
 -		Return(&model.Action{}, nil)
@@ -497,14 +497,14 @@ index 98fc841a..148fa1f6 100644
  
  	expectStepFileCommands(t, cm)
  
--	salm.On("runAction", sal, filepath.Clean("/tmp/path/to/action"), (*remoteAction)(nil)).Return(noopExecutor)
-+	salm.On("runAction", sal, actionDir, (*remoteAction)(nil)).Return(noopExecutor)
- 
- 	err := sal.pre()(ctx)
- 	require.NoError(t, err)
-@@ -88,6 +99,7 @@ func TestStepActionLocalTest(t *testing.T) {
- 	err = sal.main()(ctx)
- 	require.NoError(t, err)
+-	salm.On("runAction", sal, filepath.Clean("/tmp/path/to/action"), (*remoteAction)(nil)).Return(func(ctx context.Context) error {
++	salm.On("runAction", sal, actionDir, (*remoteAction)(nil)).Return(func(ctx context.Context) error {
+ 		sal.RunContext.setOutput(ctx, map[string]string{"name": "value"}, "ran")
+ 		return nil
+ 	})
+@@ -106,6 +117,7 @@ func TestStepActionLocalTest(t *testing.T) {
+ 	assert.Equal(t, "other/action", sal.RunContext.Env["GITHUB_ACTION_REPOSITORY"])
+ 	assert.Equal(t, "v1", sal.RunContext.Env["GITHUB_ACTION_REF"])
  
 +	require.NoFileExists(t, filepath.Join(actionDir, "trampoline.js"))
  	cm.AssertExpectations(t)
