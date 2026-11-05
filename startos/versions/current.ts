@@ -1,48 +1,23 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '5.3.0:0',
+  version: '5.4.0:0',
   releaseNotes: {
-    en_US: `Updated Gitea Runner to 5.3.0.
+    en_US: `Updated Gitea Runner to 5.4.0. Retries failed image pulls and Dockerfile action builds, fixes concurrent jobs building the same Dockerfile action, and fixes built-in Git LFS checkout with older Git LFS versions. Requires StartOS 0.4.1 or later.
 
-- Adds GITEA_* aliases for built-in GITHUB_* workflow environment variables and fixes action repository/ref values leaking between steps.
-- Upstream now scopes workflow caches by ref; existing caches start cold after upgrading. This package continues to disable the cache service.
-- Fixes the v4 artifact API used by upload-artifact v4 and later, Docker proxy probe container leaks, and a local reusable-workflow CLI panic. Includes a networking dependency security update for CVE-2026-78661.
-- The runner can now take jobs from a Gitea on another server: choose Remote server under Gitea Instance in Configure and enter its address and a fresh registration token. Gitea on this server is then not needed.
+[Full release notes](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
+    es_ES: `Gitea Runner actualizado a 5.4.0. Reintenta las descargas de imágenes y las compilaciones de acciones Dockerfile fallidas, corrige los trabajos simultáneos que compilan la misma acción Dockerfile y corrige la extracción integrada de Git LFS con versiones antiguas de Git LFS. Requiere StartOS 0.4.1 o posterior.
 
-[5.3.0 release notes](https://gitea.com/gitea/runner/releases/tag/v5.3.0) · [5.2.4 release notes](https://gitea.com/gitea/runner/releases/tag/v5.2.4)`,
-    es_ES: `Gitea Runner actualizado a 5.3.0.
+[Notas completas de la versión](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
+    de_DE: `Gitea Runner auf 5.4.0 aktualisiert. Wiederholt fehlgeschlagene Image-Downloads und Dockerfile-Action-Builds, behebt gleichzeitige Jobs beim Erstellen derselben Dockerfile-Action und korrigiert den integrierten Git-LFS-Checkout mit älteren Git-LFS-Versionen. Erfordert StartOS 0.4.1 oder neuer.
 
-- Añade alias GITEA_* para las variables de entorno GITHUB_* integradas de los flujos y corrige la filtración de los valores de repositorio y referencia de acciones entre pasos.
-- Upstream ahora limita las cachés de los flujos por referencia; las cachés existentes deben regenerarse tras actualizar. Este paquete mantiene desactivado el servicio de caché.
-- Corrige la API de artefactos v4 utilizada por upload-artifact v4 y posteriores, las fugas de contenedores de la comprobación del proxy Docker y un fallo de la CLI con flujos reutilizables locales. Incluye una actualización de seguridad de una dependencia de red para CVE-2026-78661.
-- El ejecutor ahora puede tomar trabajos de un Gitea en otro servidor: elija Servidor remoto en Instancia de Gitea en Configurar e introduzca su dirección y un token de registro nuevo. Entonces no se necesita Gitea en este servidor.
+[Vollständige Versionshinweise](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
+    pl_PL: `Zaktualizowano Gitea Runner do 5.4.0. Ponawia nieudane pobieranie obrazów i budowanie akcji Dockerfile, naprawia równoległe zadania budujące tę samą akcję Dockerfile oraz wbudowane pobieranie Git LFS ze starszymi wersjami Git LFS. Wymaga StartOS 0.4.1 lub nowszego.
 
-[Notas de la versión 5.3.0](https://gitea.com/gitea/runner/releases/tag/v5.3.0) · [Notas de la versión 5.2.4](https://gitea.com/gitea/runner/releases/tag/v5.2.4)`,
-    de_DE: `Gitea Runner auf 5.3.0 aktualisiert.
+[Pełne informacje o wydaniu](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
+    fr_FR: `Gitea Runner mis à jour vers la version 5.4.0. Réessaie les téléchargements d’images et les compilations d’actions Dockerfile en échec, corrige les tâches simultanées compilant la même action Dockerfile et corrige l’extraction Git LFS intégrée avec les anciennes versions de Git LFS. Nécessite StartOS 0.4.1 ou ultérieur.
 
-- Ergänzt GITEA_*-Aliase für integrierte GITHUB_*-Umgebungsvariablen in Workflows und behebt das Übertragen von Action-Repository und -Ref auf andere Schritte.
-- Upstream trennt Workflow-Caches nun nach Ref; bestehende Caches müssen nach dem Upgrade neu aufgebaut werden. Dieses Paket deaktiviert den Cache-Dienst weiterhin.
-- Behebt die von upload-artifact v4 und neuer verwendete Artefakt-API v4, zurückgelassene Container bei Docker-Proxy-Prüfungen und einen CLI-Absturz bei lokalen wiederverwendbaren Workflows. Enthält ein Sicherheitsupdate einer Netzwerkabhängigkeit für CVE-2026-78661.
-- Der Runner kann jetzt Jobs von einem Gitea auf einem anderen Server übernehmen: Wählen Sie unter Gitea-Instanz in Konfigurieren „Entfernter Server“ und geben Sie dessen Adresse und ein neues Registrierungs-Token ein. Gitea auf diesem Server wird dann nicht benötigt.
-
-[Versionshinweise zu 5.3.0](https://gitea.com/gitea/runner/releases/tag/v5.3.0) · [Versionshinweise zu 5.2.4](https://gitea.com/gitea/runner/releases/tag/v5.2.4)`,
-    pl_PL: `Zaktualizowano Gitea Runner do 5.3.0.
-
-- Dodaje aliasy GITEA_* dla wbudowanych zmiennych środowiskowych GITHUB_* przepływów i naprawia przenikanie wartości repozytorium i referencji akcji między krokami.
-- Upstream ogranicza teraz pamięć podręczną przepływów do referencji; istniejąca pamięć podręczna musi zostać odbudowana po aktualizacji. Ten pakiet nadal wyłącza usługę pamięci podręcznej.
-- Naprawia API artefaktów v4 używane przez upload-artifact v4 i nowsze, pozostawianie kontenerów przez sondę proxy Dockera oraz awarię CLI przy lokalnych przepływach wielokrotnego użytku. Zawiera aktualizację bezpieczeństwa zależności sieciowej dla CVE-2026-78661.
-- Runner może teraz pobierać zadania z Gitea na innym serwerze: w akcji Konfiguruj wybierz Serwer zdalny w polu Instancja Gitea i podaj jego adres oraz nowy token rejestracji. Gitea na tym serwerze nie jest wtedy potrzebne.
-
-[Informacje o wydaniu 5.3.0](https://gitea.com/gitea/runner/releases/tag/v5.3.0) · [Informacje o wydaniu 5.2.4](https://gitea.com/gitea/runner/releases/tag/v5.2.4)`,
-    fr_FR: `Gitea Runner mis à jour vers la version 5.3.0.
-
-- Ajoute des alias GITEA_* pour les variables d’environnement GITHUB_* intégrées des workflows et corrige la propagation du dépôt et de la référence d’une action entre les étapes.
-- Le projet amont limite désormais les caches des workflows par référence ; les caches existants doivent être reconstruits après la mise à niveau. Ce paquet continue de désactiver le service de cache.
-- Corrige l’API d’artefacts v4 utilisée par upload-artifact v4 et les versions ultérieures, les conteneurs abandonnés par la sonde du proxy Docker et un plantage de la CLI avec les workflows réutilisables locaux. Inclut une mise à jour de sécurité d’une dépendance réseau pour CVE-2026-78661.
-- Le runner peut désormais recevoir des tâches d’un Gitea sur un autre serveur : choisissez Serveur distant sous Instance Gitea dans Configurer et saisissez son adresse et un nouveau jeton d’inscription. Gitea n’est alors plus nécessaire sur ce serveur.
-
-[Notes de version 5.3.0](https://gitea.com/gitea/runner/releases/tag/v5.3.0) · [Notes de version 5.2.4](https://gitea.com/gitea/runner/releases/tag/v5.2.4)`,
+[Notes de version complètes](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
   },
   migrations: {
     up: async () => {},
