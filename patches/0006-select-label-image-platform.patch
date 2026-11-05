@@ -3,10 +3,10 @@ Subject: [PATCH] Select job and action image architecture from Docker labels
 Retire when upstream selects Docker image platforms per expanded job and carries them into reusable workflows.
 
 diff --git a/act/runner/action.go b/act/runner/action.go
-index 042f529f..b9fca404 100644
+index 44b4496..90d22b3 100644
 --- a/act/runner/action.go
 +++ b/act/runner/action.go
-@@ -328,8 +328,8 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+@@ -331,8 +331,8 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
  		}
  
  		correctArchExists := anyArchExists
@@ -17,27 +17,25 @@ index 042f529f..b9fca404 100644
  			if err != nil {
  				return err
  			}
-@@ -346,7 +346,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+@@ -349,13 +349,13 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
  		}
  
  		if !correctArchExists || rc.Config.ForceRebuild {
 -			logger.Debugf("image '%s' for architecture '%s' will be built from context '%s", image, rc.Config.ContainerArchitecture, contextDir)
 +			logger.Debugf("image '%s' for architecture '%s' will be built from context '%s", image, rc.dockerImagePlatform(ctx), contextDir)
- 			var buildContext io.ReadCloser
- 			if localAction {
- 				buildContext, err = rc.JobContainer.GetContainerArchive(ctx, contextDir+"/.")
-@@ -360,7 +360,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
- 				Dockerfile:   fileName,
- 				ImageTag:     image,
- 				BuildContext: buildContext,
--				Platform:     rc.Config.ContainerArchitecture,
-+				Platform:     rc.dockerImagePlatform(ctx),
- 				BuildArgs:    rc.proxyBuildArgs(),
- 			})
- 			if buildContext == nil {
-@@ -376,7 +376,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+ 			prepImage = common.Executor(func(ctx context.Context) error {
+ 				input := container.NewDockerBuildExecutorInput{
+ 					ContextDir: contextDir,
+ 					Dockerfile: fileName,
+ 					ImageTag:   image,
+-					Platform:   rc.Config.ContainerArchitecture,
++					Platform:   rc.dockerImagePlatform(ctx),
+ 					BuildArgs:  rc.proxyBuildArgs(),
  				}
- 			}
+ 				if localAction {
+@@ -375,7 +375,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, actionDir, b
+ 				return ContainerNewDockerBuildExecutor(input)(ctx)
+ 			}).Retry(3)
  		} else {
 -			logger.Debugf("image '%s' for architecture '%s' already exists", image, rc.Config.ContainerArchitecture)
 +			logger.Debugf("image '%s' for architecture '%s' already exists", image, rc.dockerImagePlatform(ctx))
@@ -54,10 +52,10 @@ index 042f529f..b9fca404 100644
  		AutoRemove:    true,
  		ValidVolumes:  rc.validVolumes(),
 diff --git a/act/runner/action_test.go b/act/runner/action_test.go
-index c015807e..6a49f7e9 100644
+index fb47171..faaebaf 100644
 --- a/act/runner/action_test.go
 +++ b/act/runner/action_test.go
-@@ -476,13 +476,11 @@ func TestExecAsDockerImageChecks(t *testing.T) {
+@@ -509,13 +509,11 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  	t.Cleanup(func() {
  		ContainerImageExistsLocally, ContainerNewDockerBuildExecutor, ContainerNewContainer = originalExists, originalBuild, originalContainer
  	})
@@ -75,7 +73,7 @@ index c015807e..6a49f7e9 100644
  	}{
  		{name: "missing image", platform: "linux/arm64", wantBuild: true, wantChecks: []string{"any"}},
  		{name: "unspecified platform", exists: true, matches: true, wantChecks: []string{"any"}},
-@@ -490,15 +488,27 @@ func TestExecAsDockerImageChecks(t *testing.T) {
+@@ -523,15 +521,27 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  		{name: "matching platform", platform: "linux/arm64", exists: true, matches: true, wantChecks: []string{"any", "linux/arm64"}},
  		{name: "different platform", platform: "linux/arm64", exists: true, wantBuild: true, wantRemove: true, wantChecks: []string{"any", "linux/arm64"}},
  		{name: "forced rebuild", exists: true, matches: true, rebuild: true, wantBuild: true, wantChecks: []string{"any"}},
@@ -104,7 +102,7 @@ index c015807e..6a49f7e9 100644
  				return func(context.Context) error { built = true; return nil }
  			}
  			fakeDockerDaemon(t, func(writer http.ResponseWriter, request *http.Request) {
-@@ -516,6 +526,9 @@ func TestExecAsDockerImageChecks(t *testing.T) {
+@@ -549,6 +559,9 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  						PresetGitHubContext:   &model.GithubContext{},
  						ContainerArchitecture: testcase.platform,
  						ForceRebuild:          testcase.rebuild,
@@ -116,7 +114,7 @@ index c015807e..6a49f7e9 100644
  					JobContainer: &jobContainerMock{},
 diff --git a/act/runner/image_platform_test.go b/act/runner/image_platform_test.go
 new file mode 100644
-index 00000000..b3184f19
+index 0000000..b3184f1
 --- /dev/null
 +++ b/act/runner/image_platform_test.go
 @@ -0,0 +1,37 @@
@@ -158,10 +156,10 @@ index 00000000..b3184f19
 +	require.Equal(t, "linux/amd64", rc.dockerImagePlatform(t.Context()))
 +}
 diff --git a/act/runner/run_context.go b/act/runner/run_context.go
-index 8b8e48ba..9172c914 100644
+index 50db6fb..8d02ca1 100644
 --- a/act/runner/run_context.go
 +++ b/act/runner/run_context.go
-@@ -582,7 +582,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
+@@ -654,7 +654,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
  			Stderr:          logWriter,
  			Privileged:      rc.Config.Privileged,
  			UsernsMode:      rc.Config.UsernsMode,
@@ -170,7 +168,7 @@ index 8b8e48ba..9172c914 100644
  			RunnerOptions:   rc.Config.ContainerOptions,
  			WorkflowOptions: rc.containerSpec.Options,
  			AutoRemove:      true,
-@@ -684,7 +684,7 @@ func (rc *RunContext) jobServices(ctx context.Context, networkName string) (map[
+@@ -761,7 +761,7 @@ func (rc *RunContext) jobServices(ctx context.Context, networkName string) (map[
  			Stderr:          serviceLog,
  			Privileged:      rc.Config.Privileged,
  			UsernsMode:      rc.Config.UsernsMode,
@@ -179,7 +177,7 @@ index 8b8e48ba..9172c914 100644
  			AutoRemove:      false, // so a dead service's log survives, cleanupJobResources removes it
  			WorkflowOptions: spec.Options,
  			NetworkMode:     networkName,
-@@ -1273,6 +1273,15 @@ func (rc *RunContext) runsOnImage(ctx context.Context) (string, error) {
+@@ -1375,6 +1375,15 @@ func (rc *RunContext) runsOnImage(ctx context.Context) (string, error) {
  	return "", nil
  }
  
@@ -196,10 +194,10 @@ index 8b8e48ba..9172c914 100644
  	job := rc.Run.Job()
  
 diff --git a/act/runner/runner.go b/act/runner/runner.go
-index 8b1f41c4..e0bf8bab 100644
+index acfd21f..5c76384 100644
 --- a/act/runner/runner.go
 +++ b/act/runner/runner.go
-@@ -80,6 +80,7 @@ type Config struct {
+@@ -81,6 +81,7 @@ type Config struct {
  	// AppURL. It is never set for github.com or a GithubMirror, so the token stays on-instance.
  	DefaultActionInstanceIsSelfHosted bool
  	PlatformPicker                    func(labels []string) string
@@ -209,7 +207,7 @@ index 8b1f41c4..e0bf8bab 100644
  	JobLoggerLevel                    *logging.Level // the level of job logger
 diff --git a/docs/assigned-task-isolation.md b/docs/assigned-task-isolation.md
 new file mode 100644
-index 00000000..49d3aa30
+index 0000000..49d3aa3
 --- /dev/null
 +++ b/docs/assigned-task-isolation.md
 @@ -0,0 +1,11 @@
@@ -225,10 +223,10 @@ index 00000000..49d3aa30
 +
 +Runner-level Gitea client-certificate fields are not the Docker mTLS identity. Builtin checkout can copy those configured Gitea client keys into a job; a VM package must leave those fields unset. Docker client private keys and persistent registration remain controller-only.
 diff --git a/internal/app/run/runner.go b/internal/app/run/runner.go
-index ae8d7b01..7ead3358 100644
+index ac32e45..a400e49 100644
 --- a/internal/app/run/runner.go
 +++ b/internal/app/run/runner.go
-@@ -646,6 +646,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
+@@ -653,6 +653,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
  		DefaultActionInstance:             r.getDefaultActionsURL(task),
  		DefaultActionInstanceIsSelfHosted: r.isSelfHostedActionsURL(task),
  		PlatformPicker:                    platformPicker,
@@ -237,7 +235,7 @@ index ae8d7b01..7ead3358 100644
  		JobCompletedHook:                  r.cfg.Runner.Hooks.JobCompleted,
  		Vars:                              task.Vars,
 diff --git a/internal/pkg/labels/labels.go b/internal/pkg/labels/labels.go
-index bf5317f9..b86c9151 100644
+index bf5317f..b86c915 100644
 --- a/internal/pkg/labels/labels.go
 +++ b/internal/pkg/labels/labels.go
 @@ -5,6 +5,8 @@ package labels
@@ -356,7 +354,7 @@ index bf5317f9..b86c9151 100644
  	return ls
 diff --git a/internal/pkg/labels/platform_test.go b/internal/pkg/labels/platform_test.go
 new file mode 100644
-index 00000000..0aa1bd1f
+index 0000000..0aa1bd1
 --- /dev/null
 +++ b/internal/pkg/labels/platform_test.go
 @@ -0,0 +1,35 @@
