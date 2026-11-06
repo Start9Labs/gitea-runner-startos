@@ -2,7 +2,7 @@
   "name": "gitea-runner-startos",
   "dependencies": {
     "@start9labs/start-sdk": "4.0.0",
-    "forgejo-runner-startos": "github:Start9Labs/forgejo-runner-startos#dd0147d4e57ef961ecd1779edc5bc2cb334ad5a8",
+    "forgejo-runner-startos": "github:Start9Labs/forgejo-runner-startos#cd562d12b6b1ffa9a30e6b7866eaa299b76c5eb5",
     "gitea-startos": "github:Start9Labs/gitea-startos#next"
   },
   "overrides": {

@@ -23,7 +23,7 @@ Follow runs, logs and artifacts in Gitea's **Actions** tab. Here, an idle virtua
 
 Reusable-workflow jobs and matrices run sequentially within each assignment. Separate assignments can still overlap up to your configured limit. Guest disks are bounded; if a build fills its disk, reduce concurrent jobs to allow a larger per-guest budget, or reduce the build's storage use.
 
-VM job images are pulled into a fresh guest for each assignment, so image downloads can take time even after the guest base is prepared. Container mode can retain engine image layers between assignments.
+VM job images are pulled into a fresh guest for each assignment, so image downloads can take time even after the guest base is prepared. Container mode can retain engine image layers between assignments, but containers, networks and volumes created through a job's Docker socket are removed when the job ends. Do not use that socket to deploy long-running services.
 
 ### Labels and emulation
 
