@@ -104,6 +104,7 @@ run_controller() {
   gitea-runner --config "$config" config set container.require_docker true
   gitea-runner --config "$config" config set container.privileged true
   gitea-runner --config "$config" config set container.docker_host "$DOCKER_HOST"
+  gitea-runner --config "$config" config set container.sweep true
   if [ -n "${RUNNER_BEFORE_JOB:-}" ]; then
     gitea-runner --config "$config" config set runner.before_job "$RUNNER_BEFORE_JOB"
   fi
