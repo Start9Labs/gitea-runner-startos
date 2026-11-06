@@ -55,12 +55,13 @@ diff --git a/act/runner/action_test.go b/act/runner/action_test.go
 index fb47171..faaebaf 100644
 --- a/act/runner/action_test.go
 +++ b/act/runner/action_test.go
-@@ -509,13 +509,11 @@ func TestExecAsDockerImageChecks(t *testing.T) {
+@@ -509,5 +509,4 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  	t.Cleanup(func() {
  		ContainerImageExistsLocally, ContainerNewDockerBuildExecutor, ContainerNewContainer = originalExists, originalBuild, originalContainer
  	})
 -	ContainerNewContainer = func(*container.NewContainerInput) container.ExecutionsEnvironment { return fakeContainer{} }
--
+ 	var removed bool
+@@ -525,8 +524,8 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  	for _, testcase := range []struct {
 -		name, platform           string
 -		exists, matches, rebuild bool
@@ -73,7 +74,7 @@ index fb47171..faaebaf 100644
  	}{
  		{name: "missing image", platform: "linux/arm64", wantBuild: true, wantChecks: []string{"any"}},
  		{name: "unspecified platform", exists: true, matches: true, wantChecks: []string{"any"}},
-@@ -523,15 +521,27 @@ func TestExecAsDockerImageChecks(t *testing.T) {
+@@ -534,16 +533,28 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  		{name: "matching platform", platform: "linux/arm64", exists: true, matches: true, wantChecks: []string{"any", "linux/arm64"}},
  		{name: "different platform", platform: "linux/arm64", exists: true, wantBuild: true, wantRemove: true, wantChecks: []string{"any", "linux/arm64"}},
  		{name: "forced rebuild", exists: true, matches: true, rebuild: true, wantBuild: true, wantChecks: []string{"any"}},
@@ -95,13 +96,14 @@ index fb47171..faaebaf 100644
  				checks = append(checks, platform)
  				return testcase.exists && (platform == "any" || testcase.matches), nil
  			}
- 			var built, removed bool
+ 			var built bool
+ 			removed = false
 -			ContainerNewDockerBuildExecutor = func(container.NewDockerBuildExecutorInput) common.Executor {
 +			ContainerNewDockerBuildExecutor = func(input container.NewDockerBuildExecutorInput) common.Executor {
 +				assert.Equal(t, wantPlatform, input.Platform)
  				return func(context.Context) error { built = true; return nil }
  			}
- 			fakeDockerDaemon(t, func(writer http.ResponseWriter, request *http.Request) {
+ 			step := &stepActionRemote{
 @@ -549,6 +559,9 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  						PresetGitHubContext:   &model.GithubContext{},
  						ContainerArchitecture: testcase.platform,

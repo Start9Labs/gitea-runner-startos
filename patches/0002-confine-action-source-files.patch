@@ -328,10 +328,11 @@ index 1f919492..c015807e 100644
  
  	unlock, err := git.AcquireCloneLock(t.Context(), actionDir)
  	require.NoError(t, err)
-@@ -523,6 +524,7 @@ func TestExecAsDockerImageChecks(t *testing.T) {
+@@ -557,6 +558,8 @@ func TestExecAsDockerImageChecks(t *testing.T) {
  				env:    map[string]string{},
  			}
- 			dir := t.TempDir()
+ 			dir := filepath.Join(actionRoot, testcase.name)
++			require.NoError(t, os.MkdirAll(dir, 0o755))
 +			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM scratch\n"), 0o600))
  			require.NoError(t, execAsDocker(t.Context(), step, "action", dir, dir, false, stepStageMain))
  			assert.Equal(t, testcase.wantChecks, checks)
