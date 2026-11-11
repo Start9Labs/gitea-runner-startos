@@ -1,23 +1,43 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '5.4.1:0',
+  version: '6.0.0:0',
   releaseNotes: {
-    en_US: `Updated Gitea Runner to 5.4.1. Fixes gaps in secret masking in workflow command logs. Retries failed image pulls and Dockerfile action builds, fixes concurrent jobs building the same Dockerfile action, and fixes built-in Git LFS checkout with older Git LFS versions. Requires StartOS 0.4.1 or later.
+    en_US: `Updated Gitea Runner to 6.0.0. Requires StartOS 0.4.2 or later and Gitea 1.26.2 or later, including remote instances.
 
-[5.4.1 release notes](https://gitea.com/gitea/runner/releases/tag/v5.4.1) · [5.4.0 release notes](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
-    es_ES: `Gitea Runner actualizado a 5.4.1. Corrige fallos en el enmascaramiento de secretos en los registros de comandos de los flujos. Reintenta las descargas de imágenes y las compilaciones de acciones Dockerfile fallidas, corrige los trabajos simultáneos que compilan la misma acción Dockerfile y corrige la extracción integrada de Git LFS con versiones antiguas de Git LFS. Requiere StartOS 0.4.1 o posterior.
+**Before updating:** replace every \`uses: builtin:checkout\` in your workflows with a version-pinned checkout action, such as \`actions/checkout\` or \`taiki-e/checkout-action\` (without Node). Built-in checkout has been removed.
 
-[Notas de la versión 5.4.1](https://gitea.com/gitea/runner/releases/tag/v5.4.1) · [Notas de la versión 5.4.0](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
-    de_DE: `Gitea Runner auf 5.4.1 aktualisiert. Behebt Lücken bei der Maskierung von Secrets in Workflow-Befehlsprotokollen. Wiederholt fehlgeschlagene Image-Downloads und Dockerfile-Action-Builds, behebt gleichzeitige Jobs beim Erstellen derselben Dockerfile-Action und korrigiert den integrierten Git-LFS-Checkout mit älteren Git-LFS-Versionen. Erfordert StartOS 0.4.1 oder neuer.
+Fixes jobs hanging after cancellation when Docker stops responding, expression handling, and log-group commands.
 
-[Versionshinweise zu 5.4.1](https://gitea.com/gitea/runner/releases/tag/v5.4.1) · [Versionshinweise zu 5.4.0](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
-    pl_PL: `Zaktualizowano Gitea Runner do 5.4.1. Naprawia luki w maskowaniu sekretów w dziennikach poleceń przepływów. Ponawia nieudane pobieranie obrazów i budowanie akcji Dockerfile, naprawia równoległe zadania budujące tę samą akcję Dockerfile oraz wbudowane pobieranie Git LFS ze starszymi wersjami Git LFS. Wymaga StartOS 0.4.1 lub nowszego.
+[Full upstream release notes](https://gitea.com/gitea/runner/releases/tag/v6.0.0)`,
+    es_ES: `Gitea Runner actualizado a 6.0.0. Requiere StartOS 0.4.2 o posterior y Gitea 1.26.2 o posterior, incluidas las instancias remotas.
 
-[Informacje o wydaniu 5.4.1](https://gitea.com/gitea/runner/releases/tag/v5.4.1) · [Informacje o wydaniu 5.4.0](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
-    fr_FR: `Gitea Runner mis à jour vers la version 5.4.1. Corrige des lacunes dans le masquage des secrets dans les journaux de commandes des workflows. Réessaie les téléchargements d’images et les compilations d’actions Dockerfile en échec, corrige les tâches simultanées compilant la même action Dockerfile et corrige l’extraction Git LFS intégrée avec les anciennes versions de Git LFS. Nécessite StartOS 0.4.1 ou ultérieur.
+**Antes de actualizar:** sustituya cada \`uses: builtin:checkout\` de sus flujos por una acción de checkout fijada a una versión, como \`actions/checkout\` o \`taiki-e/checkout-action\` (sin Node). Se ha eliminado el checkout integrado.
 
-[Notes de version 5.4.1](https://gitea.com/gitea/runner/releases/tag/v5.4.1) · [Notes de version 5.4.0](https://gitea.com/gitea/runner/releases/tag/v5.4.0)`,
+Corrige los trabajos bloqueados tras cancelarlos cuando Docker deja de responder, la gestión de expresiones y los comandos de grupos de registros.
+
+[Notas completas de la versión](https://gitea.com/gitea/runner/releases/tag/v6.0.0)`,
+    de_DE: `Gitea Runner auf 6.0.0 aktualisiert. Erfordert StartOS ab 0.4.2 und Gitea ab 1.26.2, auch auf entfernten Instanzen.
+
+**Vor dem Update:** Jedes \`uses: builtin:checkout\` in Workflows durch eine versionsgebundene Checkout-Action wie \`actions/checkout\` oder \`taiki-e/checkout-action\` (ohne Node) ersetzen. Der integrierte Checkout wurde entfernt.
+
+Behebt nach Abbruch hängende Jobs bei nicht antwortendem Docker sowie die Verarbeitung von Ausdrücken und Protokollgruppenbefehlen.
+
+[Vollständige Versionshinweise](https://gitea.com/gitea/runner/releases/tag/v6.0.0)`,
+    pl_PL: `Zaktualizowano Gitea Runner do 6.0.0. Wymaga StartOS 0.4.2 lub nowszego i Gitea 1.26.2 lub nowszego, także na zdalnych instancjach.
+
+**Przed aktualizacją:** zastąp każde \`uses: builtin:checkout\` w przepływach akcją checkout przypiętą do wersji, taką jak \`actions/checkout\` lub \`taiki-e/checkout-action\` (bez Node). Wbudowany checkout został usunięty.
+
+Naprawia zawieszanie zadań po anulowaniu, gdy Docker nie odpowiada, obsługę wyrażeń oraz polecenia grup dziennika.
+
+[Pełne informacje o wydaniu](https://gitea.com/gitea/runner/releases/tag/v6.0.0)`,
+    fr_FR: `Gitea Runner mis à jour vers la version 6.0.0. Nécessite StartOS 0.4.2 ou ultérieur et Gitea 1.26.2 ou ultérieur, y compris pour les instances distantes.
+
+**Avant la mise à jour :** remplacez chaque \`uses: builtin:checkout\` de vos workflows par une action de checkout épinglée à une version, comme \`actions/checkout\` ou \`taiki-e/checkout-action\` (sans Node). Le checkout intégré a été supprimé.
+
+Corrige les tâches bloquées après annulation lorsque Docker ne répond plus, le traitement des expressions et les commandes de groupes de journaux.
+
+[Notes de version complètes](https://gitea.com/gitea/runner/releases/tag/v6.0.0)`,
   },
   migrations: {
     up: async () => {},

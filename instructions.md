@@ -6,7 +6,7 @@
 
 ## Getting set up
 
-Your runner serves **Gitea on this device** or **Gitea on another server**. Have Actions enabled on the selected Gitea before configuring the runner. For this device's Gitea, it must also be running here.
+Your runner serves **Gitea on this device** or **Gitea on another server**. Use a Gitea release supported by the runner and have Actions enabled before configuring it. For this device's Gitea, it must also be running here.
 
 1. In Gitea, create a runner registration token under **Site / Organization / Repository Settings → Actions → Runners → Create new Runner**.
 2. Open **Configure** here. Under **Gitea Instance**, keep **This server**, or choose **Remote server** and enter the address you open Gitea at, such as `https://git.example.com`. An HTTPS address needs a publicly trusted certificate, so a remote `.local` address does not work. Paste the token from that Gitea and choose a runner name, labels and concurrent-job limit. The default label is `ubuntu-latest`.
@@ -33,13 +33,7 @@ Enable **Enable Emulation** in Configure to add the other CPU architecture's lab
 
 ### Checkout and HTTPS
 
-The built-in checkout action can use your job's token without downloading another action:
-
-```yaml
-- uses: builtin:checkout
-```
-
-Your job image needs Git; SSH checkout also needs an SSH client. Ordinary jobs receive this server's public StartOS certificate trust and, when using Gitea on this device, routing for Gitea's local hostname. A remote Gitea's address must also be reachable from job containers. If you use a custom Docker action image, provide its required certificate trust and DNS configuration in that image or workflow. Do not disable certificate verification to work around a failing connection.
+Use a version-pinned checkout action, such as [actions/checkout](https://github.com/actions/checkout) or [taiki-e/checkout-action](https://github.com/taiki-e/checkout-action) (without Node). Follow that action's requirements for Git, Node and SSH in your job image. Ordinary jobs receive this server's public StartOS certificate trust and, when using Gitea on this device, routing for Gitea's local hostname. A remote Gitea's address must also be reachable from job containers. If you use a custom Docker action image, provide its required certificate trust and DNS configuration in that image or workflow. Do not disable certificate verification to work around a failing connection.
 
 ### Choosing container mode
 
