@@ -14,11 +14,12 @@ index 37dd629d..0e448e02 100644
  			func(ctx context.Context) error { rc.setRunnerContextEnv(ctx); return nil },
  			rc.captureJobContainerInfo(),
  			rc.copyWorkflowFiles(),
-@@ -620,6 +621,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
+@@ -620,7 +621,8 @@ func (rc *RunContext) startJobContainer() common.Executor {
  			func(ctx context.Context) error { return rc.createJobVolumes(ctx, containerInput.Mounts) },
  			rc.JobContainer.Create(rc.Config.ContainerCapAdd, rc.Config.ContainerCapDrop),
  			rc.JobContainer.Start(false),
 +			rc.installTrustedRootCA(),
+ 			func(context.Context) error { rc.taskWorkspace = taskWorkspace; return nil },
  			rc.captureJobContainerInfo(),
  			rc.copyWorkflowFiles(),
  			rc.waitForServiceContainers(),

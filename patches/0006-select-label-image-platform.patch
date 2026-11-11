@@ -223,7 +223,7 @@ index 0000000..49d3aa3
 +
 +`RUNNER_ROOT_CA` optionally names an operator-owned public CA PEM bundle on the controller. Private keys, non-CA certificates, malformed PEM and extra data are rejected. The public certificate is copied into the job's system trust and shared action volume, and the supported system CA updater runs as user 0 before workflow actions. Node receives `NODE_EXTRA_CA_CERTS` for the shared public certificate. Custom Docker-action and service images still own their system trust stores.
 +
-+Runner-level Gitea client-certificate fields are not the Docker mTLS identity. Builtin checkout can copy those configured Gitea client keys into a job; a VM package must leave those fields unset. Docker client private keys and persistent registration remain controller-only.
++Runner-level Gitea client-certificate fields are not the Docker mTLS identity. The VM package leaves those fields unset. Docker client private keys and persistent registration remain controller-only.
 diff --git a/internal/app/run/runner.go b/internal/app/run/runner.go
 index ac32e45..a400e49 100644
 --- a/internal/app/run/runner.go

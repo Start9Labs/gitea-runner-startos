@@ -84,7 +84,7 @@ The owner holds an exclusive lock on `runner/.runner.lock`. It registers into a 
 
 ## Dependencies
 
-Gitea is an optional dependency, enabled while **Gitea Instance** is **This server**. Then it must be running and healthy on its `primary` check, and the runner resolves its HTTP bridge address. With **Remote server** selected, the dependency and its Enable Actions task are inactive, and the runner connects to the configured URL. No dependency volume is mounted.
+Gitea is an optional dependency, enabled while **Gitea Instance** is **This server**. Then it must be running and healthy on its `primary` check, and the runner resolves its HTTP bridge address. With **Remote server** selected, the dependency and its Enable Actions task are inactive, and the runner connects to the configured URL. No dependency volume is mounted. The dependency version constraint applies only to the local package; administrators must ensure a remote instance meets the runner's upstream Gitea requirement.
 
 ## Network Access and Interfaces
 
