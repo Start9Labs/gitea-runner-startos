@@ -1,5 +1,5 @@
 ARG BINFMT_IMAGE
-FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie AS runner
+FROM --platform=$BUILDPLATFORM golang:1.27.4-trixie AS runner
 WORKDIR /src
 COPY upstream/ ./
 COPY patches/ /patches/
@@ -11,7 +11,7 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags netgo,osusergo \
-      -ldflags '-s -w -X gitea.com/gitea/runner/internal/pkg/ver.version=v6.0.0' \
+      -ldflags '-s -w -X gitea.com/gitea/runner/internal/pkg/ver.version=v6.0.1' \
       -o /bin/gitea-runner .
 FROM $BINFMT_IMAGE AS binfmt
 
